@@ -133,10 +133,10 @@ html, body, [class*="css"] {
     height: 2px;
     border-radius: 16px 16px 0 0;
 }
-.kpi-card.blue::before  { background: linear-gradient(90deg, #007aff, #5ac8fa); }
-.kpi-card.teal::before  { background: linear-gradient(90deg, #00d4aa, #34c759); }
+.kpi-card.blue::before   { background: linear-gradient(90deg, #007aff, #5ac8fa); }
+.kpi-card.teal::before   { background: linear-gradient(90deg, #00d4aa, #34c759); }
 .kpi-card.purple::before { background: linear-gradient(90deg, #6326ff, #af52de); }
-.kpi-card.red::before   { background: linear-gradient(90deg, #ff3b30, #ff6b35); }
+.kpi-card.red::before    { background: linear-gradient(90deg, #ff3b30, #ff6b35); }
 .kpi-card.orange::before { background: linear-gradient(90deg, #ff9500, #ffcc00); }
 
 .kpi-icon {
@@ -307,11 +307,11 @@ html, body, [class*="css"] {
 # DATASET (unchanged)
 # ─────────────────────────────────────────────
 data = {
-    "inflation":          [2.1, 2.3, 3.0, 4.5, 5.2, 6.1, 7.4],
-    "unemployment":       [4.1, 4.3, 5.0, 6.1, 7.2, 7.8, 8.2],
-    "sp500":              [4200, 4100, 3900, 3700, 3500, 3300, 3100],
-    "consumer_confidence":[110, 105, 100, 95, 90, 85, 80],
-    "stress_score":       [0.27, 1.43, 2.96, 4.89, 6.58, 8.13, 9.72]
+    "inflation":           [2.1, 2.3, 3.0, 4.5, 5.2, 6.1, 7.4],
+    "unemployment":        [4.1, 4.3, 5.0, 6.1, 7.2, 7.8, 8.2],
+    "sp500":               [4200, 4100, 3900, 3700, 3500, 3300, 3100],
+    "consumer_confidence": [110, 105, 100, 95, 90, 85, 80],
+    "stress_score":        [0.27, 1.43, 2.96, 4.89, 6.58, 8.13, 9.72]
 }
 df = pd.DataFrame(data)
 
@@ -397,7 +397,7 @@ for col, color, icon, label, value, delta, delta_cls in kpi_cards:
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# ③ STRESS TREND + SCATTER (Row 2 & 3)
+# ③ STRESS TREND + SCATTER
 # ─────────────────────────────────────────────
 st.markdown('<p class="section-label">📉 Economic Stress Analysis</p>', unsafe_allow_html=True)
 
@@ -407,9 +407,6 @@ with col_trend:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
     st.markdown('<p class="section-title">Economic Stress Trend</p>', unsafe_allow_html=True)
 
-    colors_fill = ["rgba(0,212,170,0.15)"] * 7
-    colors_line = "#00d4aa"
-
     fig_trend = go.Figure()
     fig_trend.add_trace(go.Scatter(
         x=list(range(1, 8)),
@@ -417,10 +414,7 @@ with col_trend:
         mode="lines+markers",
         name="Stress Score",
         line=dict(color="#00d4aa", width=2.5, shape="spline"),
-        marker=dict(
-            size=8, color="#00d4aa",
-            line=dict(color="#050d1a", width=2)
-        ),
+        marker=dict(size=8, color="#00d4aa", line=dict(color="#050d1a", width=2)),
         fill="tozeroy",
         fillcolor="rgba(0,212,170,0.08)",
         hovertemplate="<b>Period %{x}</b><br>Stress: %{y:.2f}<extra></extra>"
@@ -431,10 +425,7 @@ with col_trend:
     fig_trend.add_hline(y=4, line_dash="dash", line_color="rgba(255,149,0,0.5)", line_width=1.5,
                         annotation_text="Moderate Risk", annotation_font_color="rgba(255,180,80,0.8)",
                         annotation_position="right")
-    fig_trend.update_layout(**CHART_LAYOUT,
-                            xaxis_title="Time Period",
-                            yaxis_title="Stress Score",
-                            height=300)
+    fig_trend.update_layout(**CHART_LAYOUT, xaxis_title="Time Period", yaxis_title="Stress Score", height=300)
     st.plotly_chart(fig_trend, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -457,10 +448,7 @@ with col_scatter:
         ),
         hovertemplate="<b>Unemployment:</b> %{x}%<br><b>Stress:</b> %{y:.2f}<extra></extra>"
     ))
-    fig_scatter.update_layout(**CHART_LAYOUT,
-                              xaxis_title="Unemployment Rate (%)",
-                              yaxis_title="Stress Score",
-                              height=300)
+    fig_scatter.update_layout(**CHART_LAYOUT, xaxis_title="Unemployment Rate (%)", yaxis_title="Stress Score", height=300)
     st.plotly_chart(fig_scatter, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -491,9 +479,9 @@ with col_fi:
         textposition="inside",
         textfont=dict(color="white", size=12, family="JetBrains Mono")
     ))
-    fig_fi.update_layout(**CHART_LAYOUT,
-                         xaxis=dict(tickformat=".0%", **CHART_LAYOUT["xaxis"]),
-                         height=260, showlegend=False)
+    # ✅ FIX: use update_xaxes separately to avoid duplicate xaxis key conflict
+    fig_fi.update_layout(**CHART_LAYOUT, height=260, showlegend=False)
+    fig_fi.update_xaxes(tickformat=".0%")
     st.plotly_chart(fig_fi, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -527,14 +515,14 @@ sim_col1, sim_col2 = st.columns(2, gap="large")
 
 with sim_col1:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    sim_inflation   = st.slider("🔥 Inflation Rate (%)",         0.0, 15.0, 5.0, 0.1)
-    sim_unemployment= st.slider("👷 Unemployment Rate (%)",      0.0, 15.0, 6.0, 0.1)
+    sim_inflation    = st.slider("🔥 Inflation Rate (%)",        0.0, 15.0, 5.0, 0.1)
+    sim_unemployment = st.slider("👷 Unemployment Rate (%)",     0.0, 15.0, 6.0, 0.1)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with sim_col2:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    sim_sp500_drop  = st.slider("📉 Stock Market Drop (%)",     0.0, 50.0, 10.0, 0.5)
-    sim_confidence  = st.slider("😟 Consumer Confidence Index", 50,  120,   90,   1)
+    sim_sp500_drop = st.slider("📉 Stock Market Drop (%)",      0.0, 50.0, 10.0, 0.5)
+    sim_confidence = st.slider("😟 Consumer Confidence Index",  50,  120,   90,   1)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Core calculations (unchanged) ──
@@ -558,7 +546,6 @@ res1, res2, res3 = st.columns([1, 2, 1], gap="medium")
 with res1:
     st.markdown('<div class="glass-panel" style="text-align:center; height:100%;">', unsafe_allow_html=True)
     st.markdown(f'<p class="score-label">STRESS SCORE</p><p class="score-display">{sim_score:.2f}</p>', unsafe_allow_html=True)
-
     if sim_score > 6:
         st.markdown('<div style="text-align:center;"><span class="risk-badge high">🔴 HIGH RISK</span></div>', unsafe_allow_html=True)
     elif sim_score > 4:
@@ -568,7 +555,6 @@ with res1:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with res2:
-    # Gauge
     gauge_color = "#ff3b30" if prob > 70 else "#ff9500" if prob > 40 else "#00d4aa"
     gauge = go.Figure(go.Indicator(
         mode="gauge+number+delta",
@@ -613,29 +599,27 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 # ─────────────────────────────────────────────
 st.markdown('<p class="section-label">🔮 Predictive Forecast</p>', unsafe_allow_html=True)
 
-future = [sim_score + i * 0.3 for i in range(6)]
+future       = [sim_score + i * 0.3 for i in range(6)]
 future_probs = [min(100, s * 10) for s in future]
-months = ["Month 1","Month 2","Month 3","Month 4","Month 5","Month 6"]
+months       = ["Month 1", "Month 2", "Month 3", "Month 4", "Month 5", "Month 6"]
 
 st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
 st.markdown('<p class="section-title">6-Month Economic Risk Forecast</p>', unsafe_allow_html=True)
 
 fig_forecast = go.Figure()
 
-# Stress bars
 fig_forecast.add_trace(go.Bar(
     x=months, y=future,
     name="Stress Score",
     marker=dict(
         color=future,
-        colorscale=[[0,"rgba(0,212,170,0.7)"],[0.5,"rgba(0,122,255,0.7)"],[1,"rgba(255,59,48,0.7)"]],
+        colorscale=[[0, "rgba(0,212,170,0.7)"], [0.5, "rgba(0,122,255,0.7)"], [1, "rgba(255,59,48,0.7)"]],
         opacity=0.75
     ),
     yaxis="y",
     hovertemplate="<b>%{x}</b><br>Stress: %{y:.2f}<extra></extra>"
 ))
 
-# Recession probability line
 fig_forecast.add_trace(go.Scatter(
     x=months, y=future_probs,
     name="Recession Probability %",
@@ -686,7 +670,6 @@ with ins_col:
         insights.append(("warn", "📉", "Sharp stock market declines of this magnitude often precede recessions. Equity sell-offs typically signal deteriorating growth expectations."))
     if sim_confidence < 80:
         insights.append(("info", "😟", "Low consumer confidence indicates potential economic slowdown. Household spending — ~70% of GDP — may contract significantly."))
-
     if not insights:
         insights.append(("success", "✅", "All simulated indicators are within stable ranges. Current economic parameters suggest low recession risk for the forecast horizon."))
 
@@ -705,19 +688,19 @@ with pol_col:
     st.markdown('<p class="section-title">AI Policy Recommendation</p>', unsafe_allow_html=True)
 
     if prob > 70:
-        policy_icon = "🏦"
-        policy_text = "<strong>Immediate monetary intervention recommended.</strong> Central banks should consider easing monetary policy through rate reductions. Fiscal stimulus and enhanced unemployment support may be warranted to prevent economic contraction."
-        warning_cls = "high"
+        policy_icon   = "🏦"
+        policy_text   = "<strong>Immediate monetary intervention recommended.</strong> Central banks should consider easing monetary policy through rate reductions. Fiscal stimulus and enhanced unemployment support may be warranted to prevent economic contraction."
+        warning_cls   = "high"
         warning_label = "🔴 SEVERE RECESSION RISK"
     elif prob > 40:
-        policy_icon = "📊"
-        policy_text = "<strong>Elevated vigilance required.</strong> Monitor economic indicators closely. Prepare contingency frameworks for rapid monetary response. Watch for leading indicators of deterioration across labor and credit markets."
-        warning_cls = "medium"
+        policy_icon   = "📊"
+        policy_text   = "<strong>Elevated vigilance required.</strong> Monitor economic indicators closely. Prepare contingency frameworks for rapid monetary response. Watch for leading indicators of deterioration across labor and credit markets."
+        warning_cls   = "medium"
         warning_label = "🟡 MODERATE ECONOMIC RISK"
     else:
-        policy_icon = "🌿"
-        policy_text = "<strong>Conditions appear stable.</strong> Maintain current monetary policy stance. Continue routine macroprudential monitoring. Focus on structural improvements to long-term economic resilience."
-        warning_cls = "low"
+        policy_icon   = "🌿"
+        policy_text   = "<strong>Conditions appear stable.</strong> Maintain current monetary policy stance. Continue routine macroprudential monitoring. Focus on structural improvements to long-term economic resilience."
+        warning_cls   = "low"
         warning_label = "🟢 STABLE CONDITIONS"
 
     st.markdown(f"""
