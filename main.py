@@ -630,21 +630,27 @@ fig_forecast.add_trace(go.Scatter(
     hovertemplate="<b>%{x}</b><br>Prob: %{y:.1f}%<extra></extra>"
 ))
 
+# ✅ FIX: avoid duplicate legend/xaxis/yaxis key conflicts by using targeted update methods
 fig_forecast.update_layout(
     **CHART_LAYOUT,
     height=340,
-    yaxis=dict(title="Stress Score", **CHART_LAYOUT["yaxis"]),
+    barmode="group",
     yaxis2=dict(
         title="Recession Probability (%)",
         overlaying="y", side="right",
         range=[0, 100],
         gridcolor="rgba(0,0,0,0)",
         tickfont=dict(size=11, color="rgba(255,149,0,0.7)")
-    ),
-    barmode="group",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                **{k: v for k, v in CHART_LAYOUT["legend"].items()})
+    )
 )
+fig_forecast.update_yaxes(title_text="Stress Score", selector=dict(overlaying=None))
+fig_forecast.update_layout(legend=dict(
+    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+    bgcolor="rgba(255,255,255,0.04)",
+    bordercolor="rgba(255,255,255,0.08)",
+    borderwidth=1
+))
+
 st.plotly_chart(fig_forecast, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
