@@ -7,12 +7,12 @@ import numpy as np
 import requests
 import re
 import os
-import google.generativeai as genai
+# import google.generativeai as genai
 from sklearn.linear_model import LogisticRegression
 
 
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+# genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 # response = model.generate_content("Explain inflation")
 
@@ -948,20 +948,38 @@ Inflation: {inflation_live}
 Unemployment: {unemployment_live}
 S&P 500: {sp500_live}
 Consumer confidence: {confidence_live}
-Recession probability model output: {prob}%
+Recession probability: {prob}%
 
-Answer the user's question using economic reasoning.
+Explain the economic situation clearly.
 """
 
-    prompt = context + "\nUser question: " + question
+    OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    payload = {
+        "model": "mistralai/mistral-7b-instruct",
+        "messages": [
+            {"role": "system", "content": context},
+            {"role": "user", "content": question}
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
     try:
-        response = gemini_model.generate_content(prompt)
-        answer = response.text
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+
+        answer = data["choices"][0]["message"]["content"]
+
         st.info(answer)
 
-    except Exception as e:
-        st.error(f"AI response error: {e}")
+    except:
+        st.error("AI response failed")
 
 # ─────────────────────────────────────────────
 # Footer

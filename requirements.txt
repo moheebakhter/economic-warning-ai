@@ -6,3 +6,4 @@ scikit-learn
 requests
 plotly
 google-generativeai>=0.5.0
+openai
