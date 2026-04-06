@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 import plotly.express as px
 import numpy as np
 import requests
-
+from sklearn.linear_model import LogisticRegression
 
 
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
@@ -336,10 +337,25 @@ data = {
 }
 df = pd.DataFrame(data)
 
+# AI recession model training
+
+X = df[["inflation","unemployment","sp500","consumer_confidence"]]
+
+y = (df["stress_score"] > 5).astype(int)
+
+model = LogisticRegression()
+
+model.fit(X,y)
+
 inflation_live = get_fred("CPIAUCSL")
 unemployment_live = get_fred("UNRATE")
 sp500_live = get_fred("SP500")
 confidence_live = get_fred("UMCSENT")
+
+live_data = np.array([[inflation_live, unemployment_live, sp500_live, confidence_live]])
+
+prob = model.predict_proba(live_data)[0][1] * 100
+
 
 def risk_level(score):
     if score > 6:
@@ -421,6 +437,25 @@ for col, color, icon, label, value, delta, delta_cls in kpi_cards:
         """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+
+
+# ─────────────────────────────────────────────
+# ③ AI RECESSION PREDICTION
+# ─────────────────────────────────────────────
+
+st.subheader("🤖 AI Recession Prediction")
+
+st.metric("Recession Probability", f"{prob:.1f}%")
+
+if prob > 70:
+    st.error("High Recession Risk")
+elif prob > 40:
+    st.warning("Moderate Recession Risk")
+else:
+    st.success("Low Recession Risk")
+
+    
 
 
 # LIVE ECONOMIC DATA
