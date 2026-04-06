@@ -10,9 +10,20 @@ import requests
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
 
 def get_fred(series_id):
-    url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
-    data = requests.get(url).json()
-    return float(data["observations"][-1]["value"])
+    try:
+        url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
+        data = requests.get(url).json()
+
+        value = data["observations"][-1]["value"]
+
+        if value == ".":
+            return 0
+
+        return float(value)
+
+    except Exception as e:
+        st.warning(f"FRED API error for {series_id}")
+        return 0
 
 st.set_page_config(
     page_title="AI Economic Early Warning System",
