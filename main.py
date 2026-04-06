@@ -6,18 +6,16 @@ import plotly.express as px
 import numpy as np
 import requests
 import re
+import os
 import google.generativeai as genai
 from sklearn.linear_model import LogisticRegression
 
 
-genai.configure(api_key="AIzaSyCewxYeOWQ0w4g-VTdBWs9GqyGujYqLY4Q")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
 
-
-NEWS_API_KEY = "a4b161926aac4ca08604a28b26c9291e"
 
 
 def get_economic_news():
