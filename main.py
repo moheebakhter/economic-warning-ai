@@ -14,6 +14,10 @@ from sklearn.linear_model import LogisticRegression
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
+# response = model.generate_content("Explain inflation")
+
+# print(response.text)
+
 FRED_API_KEY = st.secrets["FRED_API_KEY"]
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
 
