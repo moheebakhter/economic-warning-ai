@@ -936,7 +936,6 @@ if question:
 
     q = question.lower()
 
-    # detect country automatically
     match = re.search(r"will (.+?) enter recession", q)
 
     if match:
@@ -944,42 +943,68 @@ if question:
     else:
         country = "Global Economy"
 
+    # dynamic economic reasoning
+    inflation_status = "high" if inflation_live > 4 else "moderate" if inflation_live > 2 else "low"
+    labor_status = "weakening" if unemployment_live > 6 else "stable"
+
+    if prob > 60:
+        recession_level = "high"
+    elif prob > 30:
+        recession_level = "moderate"
+    else:
+        recession_level = "low"
+
     if "recession" in q:
 
-        if prob > 60:
-            risk = "high"
-        elif prob > 30:
-            risk = "moderate"
-        else:
-            risk = "low"
-
         answer = f"""
-Based on current macroeconomic indicators and financial market conditions,
-the estimated recession risk for **{country}** appears **{risk}**.
+AI macroeconomic assessment for **{country}**:
 
-This analysis considers inflation trends, labor market conditions,
-and financial market volatility.
+• Inflation environment: **{inflation_status}**
+• Labor market: **{labor_status}**
+• Financial market conditions monitored via S&P 500
+
+Based on these indicators the estimated recession probability is **{prob:.1f}%**, 
+suggesting **{recession_level} recession risk** over the near-term horizon.
 """
 
     elif "inflation" in q:
 
         answer = f"""
-Current US inflation level is **{inflation_live:.2f}**.
-Persistent inflation can increase recession risk if monetary policy tightens.
+Current inflation level is **{inflation_live:.2f}**.
+
+Higher inflation can increase recession risk if central banks tighten
+monetary policy aggressively to stabilize prices.
 """
 
     elif "unemployment" in q:
 
         answer = f"""
-Current US unemployment rate is **{unemployment_live:.2f}%**.
-Labor market deterioration is one of the strongest recession indicators.
+Current unemployment rate is **{unemployment_live:.2f}%**.
+
+Rising unemployment historically precedes economic slowdowns,
+making it one of the most reliable recession indicators.
+"""
+
+    elif "market" in q or "stock" in q:
+
+        answer = f"""
+Current S&P 500 level: **{sp500_live:.0f}**.
+
+Equity markets often reflect investor expectations about future
+economic growth and recession probability.
 """
 
     else:
 
-        answer = """
-AI analysis suggests monitoring macroeconomic indicators including
-inflation, unemployment, consumer confidence, and financial markets.
+        answer = f"""
+AI economic monitoring summary:
+
+• Inflation: {inflation_live:.2f}
+• Unemployment: {unemployment_live:.2f}
+• Consumer confidence: {confidence_live:.1f}
+• Estimated recession probability: {prob:.1f}%
+
+These indicators collectively help assess macroeconomic stability.
 """
 
     st.info(answer)
