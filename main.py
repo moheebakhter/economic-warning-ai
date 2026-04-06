@@ -6,9 +6,13 @@ import plotly.express as px
 import numpy as np
 import requests
 import re
+import google.generativeai as genai
 from sklearn.linear_model import LogisticRegression
 
 
+genai.configure(api_key="AIzaSyCewxYeOWQ0w4g-VTdBWs9GqyGujYqLY4Q")
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
 
@@ -934,80 +938,25 @@ question = st.text_input("Ask the AI Economist")
 
 if question:
 
-    q = question.lower()
+    context = f"""
+You are a professional macroeconomic analyst.
 
-    match = re.search(r"will (.+?) enter recession", q)
+Current economic indicators:
 
-    if match:
-        country = match.group(1).title()
-    else:
-        country = "Global Economy"
+Inflation: {inflation_live}
+Unemployment: {unemployment_live}
+S&P 500: {sp500_live}
+Consumer confidence: {confidence_live}
+Recession probability model output: {prob}%
 
-    # dynamic economic reasoning
-    inflation_status = "high" if inflation_live > 4 else "moderate" if inflation_live > 2 else "low"
-    labor_status = "weakening" if unemployment_live > 6 else "stable"
-
-    if prob > 60:
-        recession_level = "high"
-    elif prob > 30:
-        recession_level = "moderate"
-    else:
-        recession_level = "low"
-
-    if "recession" in q:
-
-        answer = f"""
-AI macroeconomic assessment for **{country}**:
-
-• Inflation environment: **{inflation_status}**
-• Labor market: **{labor_status}**
-• Financial market conditions monitored via S&P 500
-
-Based on these indicators the estimated recession probability is **{prob:.1f}%**, 
-suggesting **{recession_level} recession risk** over the near-term horizon.
+Answer the user's question using economic reasoning.
 """
 
-    elif "inflation" in q:
+    prompt = context + "\nUser question: " + question
 
-        answer = f"""
-Current inflation level is **{inflation_live:.2f}**.
+    response = model.generate_content(prompt)
 
-Higher inflation can increase recession risk if central banks tighten
-monetary policy aggressively to stabilize prices.
-"""
-
-    elif "unemployment" in q:
-
-        answer = f"""
-Current unemployment rate is **{unemployment_live:.2f}%**.
-
-Rising unemployment historically precedes economic slowdowns,
-making it one of the most reliable recession indicators.
-"""
-
-    elif "market" in q or "stock" in q:
-
-        answer = f"""
-Current S&P 500 level: **{sp500_live:.0f}**.
-
-Equity markets often reflect investor expectations about future
-economic growth and recession probability.
-"""
-
-    else:
-
-        answer = f"""
-AI economic monitoring summary:
-
-• Inflation: {inflation_live:.2f}
-• Unemployment: {unemployment_live:.2f}
-• Consumer confidence: {confidence_live:.1f}
-• Estimated recession probability: {prob:.1f}%
-
-These indicators collectively help assess macroeconomic stability.
-"""
-
-    st.info(answer)
+    st.info(response.text)
 
 
 # ─────────────────────────────────────────────
