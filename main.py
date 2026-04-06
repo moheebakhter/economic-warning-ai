@@ -12,7 +12,7 @@ from sklearn.linear_model import LogisticRegression
 
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-gemini_model = genai.GenerativeModel("gemini-pro")
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 FRED_API_KEY = st.secrets["FRED_API_KEY"]
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
@@ -953,13 +953,7 @@ Answer the user's question using economic reasoning.
 
     try:
         response = gemini_model.generate_content(prompt)
-
-        # SAFE PARSING
-        if hasattr(response, "text") and response.text:
-            answer = response.text
-        else:
-            answer = response.candidates[0].content.parts[0].text
-
+        answer = response.text
         st.info(answer)
 
     except Exception as e:
