@@ -10,6 +10,8 @@ from sklearn.linear_model import LogisticRegression
 
 
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
+
+
 NEWS_API_KEY = "a4b161926aac4ca08604a28b26c9291e"
 
 
@@ -54,12 +56,14 @@ def get_fred(series_id):
         url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
         data = requests.get(url).json()
 
-        value = data["observations"][-1]["value"]
+        observations = data["observations"]
 
-        if value == ".":
-            return 0
+        # last valid value find karo
+        for obs in reversed(observations):
+            if obs["value"] != ".":
+                return float(obs["value"])
 
-        return float(value)
+        return 0
 
     except Exception as e:
         st.warning(f"FRED API error for {series_id}")
