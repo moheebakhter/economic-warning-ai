@@ -419,10 +419,10 @@ st.markdown('<p class="section-label">📊 Key Economic Indicators</p>', unsafe_
 k1, k2, k3, k4 = st.columns(4)
 
 kpi_cards = [
-    (k1, "blue",   "🏦", "Inflation Rate",       "3.4%",  "↑ +0.3% MoM",  "warn"),
-    (k2, "teal",   "👷", "Unemployment",          "3.8%",  "↓ −0.1% MoM",  "up"),
-    (k3, "purple", "📈", "S&P 500",               "5,100", "↑ +1.2% today","up"),
-    (k4, "red",    "⚠️", "Recession Probability", "9.7%",  "Elevated",      "down"),
+    (k1, "blue",   "🏦", "Inflation Rate",       f"{inflation_live:.2f}", "Live data", "warn"),
+    (k2, "teal",   "👷", "Unemployment",         f"{unemployment_live:.2f}", "Live data", "up"),
+    (k3, "purple", "📈", "S&P 500",              f"{sp500_live:.0f}", "Live data", "up"),
+    (k4, "red",    "⚠️", "Recession Probability", f"{prob:.1f}%", "AI Prediction", "down"),
 ]
 
 for col, color, icon, label, value, delta, delta_cls in kpi_cards:
@@ -455,7 +455,7 @@ elif prob > 40:
 else:
     st.success("Low Recession Risk")
 
-    
+
 
 
 # LIVE ECONOMIC DATA
