@@ -8,6 +8,7 @@ import requests
 from sklearn.linear_model import LogisticRegression
 
 
+
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
 
 def get_fred(series_id):
@@ -578,6 +579,47 @@ with col_data:
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+
+
+# ⑧ GLOBAL ECONOMIC RISK MAP
+# ─────────────────────────────────────────────
+
+st.markdown('<p class="section-label">🌍 Global Economic Risk Map</p>', unsafe_allow_html=True)
+
+map_data = pd.DataFrame({
+    "country": [
+        "United States",
+        "China",
+        "Germany",
+        "India",
+        "Japan",
+        "United Kingdom",
+        "France",
+        "Brazil"
+    ],
+    "risk": [
+        prob,   # AI predicted risk
+        55,
+        60,
+        40,
+        50,
+        58,
+        52,
+        45
+    ]
+})
+
+fig = px.choropleth(
+    map_data,
+    locations="country",
+    locationmode="country names",
+    color="risk",
+    color_continuous_scale="Reds",
+    title="Global Recession Risk"
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 # ─────────────────────────────────────────────
 # ⑤ SCENARIO SIMULATOR
