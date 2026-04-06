@@ -3,6 +3,16 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import numpy as np
+import requests
+
+
+
+FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
+
+def get_fred(series_id):
+    url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
+    data = requests.get(url).json()
+    return float(data["observations"][-1]["value"])
 
 st.set_page_config(
     page_title="AI Economic Early Warning System",
@@ -315,6 +325,11 @@ data = {
 }
 df = pd.DataFrame(data)
 
+inflation_live = get_fred("CPIAUCSL")
+unemployment_live = get_fred("UNRATE")
+sp500_live = get_fred("SP500")
+confidence_live = get_fred("UMCSENT")
+
 def risk_level(score):
     if score > 6:
         return "High Risk"
@@ -396,10 +411,23 @@ for col, color, icon, label, value, delta, delta_cls in kpi_cards:
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
+
+# LIVE ECONOMIC DATA
+st.subheader("Live Economic Indicators")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Inflation", inflation_live)
+col2.metric("Unemployment", unemployment_live)
+col3.metric("S&P 500", sp500_live)
+col4.metric("Consumer Sentiment", confidence_live)
+
+
 # ─────────────────────────────────────────────
 # ③ STRESS TREND + SCATTER
 # ─────────────────────────────────────────────
 st.markdown('<p class="section-label">📉 Economic Stress Analysis</p>', unsafe_allow_html=True)
+
 
 col_trend, col_scatter = st.columns([3, 2], gap="medium")
 
