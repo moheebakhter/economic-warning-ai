@@ -15,7 +15,9 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-
+FRED_API_KEY = st.secrets["FRED_API_KEY"]
+NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 
 def get_economic_news():
