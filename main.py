@@ -16,7 +16,7 @@ gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 FRED_API_KEY = st.secrets["FRED_API_KEY"]
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
 
 
 def get_economic_news():
@@ -938,7 +938,7 @@ if question:
     context = f"""
 You are a professional macroeconomic analyst.
 
-Current macroeconomic indicators:
+Current economic indicators:
 
 Inflation: {inflation_live}
 Unemployment: {unemployment_live}
@@ -946,16 +946,24 @@ S&P 500: {sp500_live}
 Consumer confidence: {confidence_live}
 Recession probability model output: {prob}%
 
-Provide a clear economic explanation.
+Answer the user's question using economic reasoning.
 """
 
     prompt = context + "\nUser question: " + question
 
     try:
         response = gemini_model.generate_content(prompt)
-        st.info(response.text)
+
+        # SAFE PARSING
+        if hasattr(response, "text") and response.text:
+            answer = response.text
+        else:
+            answer = response.candidates[0].content.parts[0].text
+
+        st.info(answer)
+
     except Exception as e:
-        st.error("AI response error")
+        st.error(f"AI response error: {e}")
 
 # ─────────────────────────────────────────────
 # Footer
