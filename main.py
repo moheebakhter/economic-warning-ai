@@ -12,8 +12,7 @@ from sklearn.linear_model import LogisticRegression
 
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 FRED_API_KEY = st.secrets["FRED_API_KEY"]
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
@@ -391,9 +390,8 @@ X = df[["inflation","unemployment","sp500","consumer_confidence"]]
 
 y = (df["stress_score"] > 5).astype(int)
 
-model = LogisticRegression()
-
-model.fit(X,y)
+recession_model = LogisticRegression()
+recession_model.fit(X,y)
 
 inflation_live = get_fred("CPIAUCSL")
 unemployment_live = get_fred("UNRATE")
@@ -402,8 +400,7 @@ confidence_live = get_fred("UMCSENT")
 
 live_data = np.array([[inflation_live, unemployment_live, sp500_live, confidence_live]])
 
-prob = model.predict_proba(live_data)[0][1] * 100
-
+prob = recession_model.predict_proba(live_data)[0][1] * 100
 
 def risk_level(score):
     if score > 6:
@@ -941,7 +938,7 @@ if question:
     context = f"""
 You are a professional macroeconomic analyst.
 
-Current economic indicators:
+Current macroeconomic indicators:
 
 Inflation: {inflation_live}
 Unemployment: {unemployment_live}
@@ -949,13 +946,13 @@ S&P 500: {sp500_live}
 Consumer confidence: {confidence_live}
 Recession probability model output: {prob}%
 
-Answer the user's question using economic reasoning.
+Provide a clear economic explanation.
 """
 
     prompt = context + "\nUser question: " + question
 
     try:
-        response = model.generate_content(prompt)
+        response = gemini_model.generate_content(prompt)
         st.info(response.text)
     except Exception as e:
         st.error("AI response error")
