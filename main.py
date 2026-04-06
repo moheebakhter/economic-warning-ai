@@ -499,6 +499,25 @@ else:
     st.success("Low Recession Risk")
 
 
+st.subheader("⚠ Economic Shock Detector")
+
+alerts = []
+
+if inflation_live > 5:
+    alerts.append("⚠ Inflation spike detected")
+
+if unemployment_live > 6:
+    alerts.append("⚠ Labor market weakening")
+
+if sp500_live < 4000:
+    alerts.append("⚠ Market volatility high")
+
+if len(alerts) == 0:
+    st.success("No major economic shocks detected")
+else:
+    for a in alerts:
+        st.warning(a)
+
 
 
 # LIVE ECONOMIC DATA
@@ -901,6 +920,39 @@ with pol_col:
     st.markdown('<p class="section-label" style="margin-bottom:0.5rem;">Warning Level</p>', unsafe_allow_html=True)
     st.markdown(f'<span class="risk-badge {warning_cls}" style="font-size:0.9rem; padding:0.5rem 1.2rem;">{warning_label}</span>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+ # ─────────────────────────────────────────────
+# AI ECONOMIST CHAT
+# ─────────────────────────────────────────────
+
+st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+st.markdown("## 🤖 AI Economist Assistant")
+
+question = st.text_input("Ask the AI Economist")
+
+if question:
+
+    if "recession" in question.lower():
+
+        if prob > 60:
+            answer = "Based on current macroeconomic indicators, recession risk is elevated."
+        elif prob > 30:
+            answer = "Economic indicators show moderate recession risk. Close monitoring advised."
+        else:
+            answer = "Current data suggests low probability of recession in the near term."
+
+    elif "inflation" in question.lower():
+        answer = f"Current inflation level is {inflation_live:.2f}. Monitoring price stability is important."
+
+    elif "unemployment" in question.lower():
+        answer = f"Current unemployment rate is {unemployment_live:.2f}%."
+
+    else:
+        answer = "AI analysis suggests monitoring macroeconomic indicators including inflation, unemployment, and financial markets."
+
+    st.info(answer)
+
 
 # ─────────────────────────────────────────────
 # Footer
