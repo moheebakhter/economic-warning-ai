@@ -12,7 +12,7 @@ from sklearn.linear_model import LogisticRegression
 
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 FRED_API_KEY = st.secrets["FRED_API_KEY"]
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
