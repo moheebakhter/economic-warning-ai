@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import numpy as np
 import requests
+import re
 from sklearn.linear_model import LogisticRegression
 
 
@@ -933,23 +934,53 @@ question = st.text_input("Ask the AI Economist")
 
 if question:
 
-    if "recession" in question.lower():
+    q = question.lower()
+
+    # detect country automatically
+    match = re.search(r"will (.+?) enter recession", q)
+
+    if match:
+        country = match.group(1).title()
+    else:
+        country = "Global Economy"
+
+    if "recession" in q:
 
         if prob > 60:
-            answer = "Based on current macroeconomic indicators, recession risk is elevated."
+            risk = "high"
         elif prob > 30:
-            answer = "Economic indicators show moderate recession risk. Close monitoring advised."
+            risk = "moderate"
         else:
-            answer = "Current data suggests low probability of recession in the near term."
+            risk = "low"
 
-    elif "inflation" in question.lower():
-        answer = f"Current inflation level is {inflation_live:.2f}. Monitoring price stability is important."
+        answer = f"""
+Based on current macroeconomic indicators and financial market conditions,
+the estimated recession risk for **{country}** appears **{risk}**.
 
-    elif "unemployment" in question.lower():
-        answer = f"Current unemployment rate is {unemployment_live:.2f}%."
+This analysis considers inflation trends, labor market conditions,
+and financial market volatility.
+"""
+
+    elif "inflation" in q:
+
+        answer = f"""
+Current US inflation level is **{inflation_live:.2f}**.
+Persistent inflation can increase recession risk if monetary policy tightens.
+"""
+
+    elif "unemployment" in q:
+
+        answer = f"""
+Current US unemployment rate is **{unemployment_live:.2f}%**.
+Labor market deterioration is one of the strongest recession indicators.
+"""
 
     else:
-        answer = "AI analysis suggests monitoring macroeconomic indicators including inflation, unemployment, and financial markets."
+
+        answer = """
+AI analysis suggests monitoring macroeconomic indicators including
+inflation, unemployment, consumer confidence, and financial markets.
+"""
 
     st.info(answer)
 
