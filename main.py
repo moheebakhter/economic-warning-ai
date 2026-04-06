@@ -10,6 +10,44 @@ from sklearn.linear_model import LogisticRegression
 
 
 FRED_API_KEY = "5ee1a026dfe571b01ad70e63873b2ef8"
+NEWS_API_KEY = "a4b161926aac4ca08604a28b26c9291e"
+
+
+def get_economic_news():
+
+    url = f"https://newsapi.org/v2/everything?q=economy OR inflation OR recession&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
+
+    data = requests.get(url).json()
+
+    articles = []
+
+    for article in data["articles"][:5]:
+        articles.append({
+            "title": article["title"],
+            "source": article["source"]["name"]
+        })
+
+    return articles
+
+
+def analyze_sentiment(text):
+
+    negative_words = ["crisis","recession","inflation","collapse","bankrupt"]
+
+    score = 0
+
+    for w in negative_words:
+        if w in text.lower():
+            score += 1
+
+    if score >= 2:
+        return "Negative"
+    elif score == 1:
+        return "Neutral"
+    else:
+        return "Positive"
+
+
 
 def get_fred(series_id):
     try:
@@ -620,6 +658,29 @@ fig = px.choropleth(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+
+# ⑨ AI ECONOMIC NEWS ANALYZER
+# ─────────────────────────────────────────────
+
+st.markdown('<p class="section-label">🧠 AI Economic News Analysis</p>', unsafe_allow_html=True)
+
+news = get_economic_news()
+
+for article in news:
+
+    sentiment = analyze_sentiment(article["title"])
+
+    if sentiment == "Negative":
+        st.error(f"{article['title']} ({article['source']})")
+
+    elif sentiment == "Neutral":
+        st.warning(f"{article['title']} ({article['source']})")
+
+    else:
+        st.success(f"{article['title']} ({article['source']})")
+
+
 
 # ─────────────────────────────────────────────
 # ⑤ SCENARIO SIMULATOR
