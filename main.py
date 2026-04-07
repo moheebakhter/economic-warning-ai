@@ -704,18 +704,21 @@ st.markdown('<p class="section-label">🧠 AI Economic News Analysis</p>', unsaf
 
 news = get_economic_news()
 
-for article in news:
+if news:
+    for article in news:
 
-    sentiment = analyze_sentiment(article["title"])
+        sentiment = analyze_sentiment(article["title"])
 
-    if sentiment == "Negative":
-        st.error(f"{article['title']} ({article['source']})")
+        if sentiment == "Negative":
+            st.error(f"{article['title']} ({article['source']})")
 
-    elif sentiment == "Neutral":
-        st.warning(f"{article['title']} ({article['source']})")
+        elif sentiment == "Neutral":
+            st.warning(f"{article['title']} ({article['source']})")
 
-    else:
-        st.success(f"{article['title']} ({article['source']})")
+        else:
+            st.success(f"{article['title']} ({article['source']})")
+else:
+    st.warning("No economic news available right now.")
 
 
 
@@ -961,34 +964,35 @@ Recession probability: {prob}%
 Explain the economic situation clearly.
 """
 
-    OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
+OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
 
-    url = "https://openrouter.ai/api/v1/chat/completions"
+url = "https://openrouter.ai/api/v1/chat/completions"
 
-    payload = {
-        "model": "openchat/openchat-3.5-1210",
-        "temperature": 0.4,
-        "messages": [
-            {"role": "system", "content": context},
-            {"role": "user", "content": question}
-        ]
-    }
+payload = {
+    "model": "mistralai/mistral-7b-instruct",
+    "temperature": 0.4,
+    "messages": [
+        {"role": "system", "content": context},
+        {"role": "user", "content": question}
+    ]
+}
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+headers = {
+    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://economic-warning-ai-moheeb.streamlit.app",
+    "X-Title": "Economic AI"
+}
 
-    
-    response = requests.post(url, json=payload, headers=headers)
+response = requests.post(url, json=payload, headers=headers)
 
-    data = response.json()
+data = response.json()
 
-    if "choices" in data:
-        answer = data["choices"][0]["message"]["content"]
-        st.info(answer)
-    else:
-        st.error("AI response failed")
+if "choices" in data:
+    answer = data["choices"][0]["message"]["content"]
+    st.info(answer)
+else:
+    st.error(data)
 
 # ─────────────────────────────────────────────
 # Footer
