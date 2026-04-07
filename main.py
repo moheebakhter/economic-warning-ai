@@ -958,7 +958,8 @@ Explain the economic situation clearly.
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     payload = {
-        "model": "mistralai/mistral-7b-instruct",
+        "model": "openchat/openchat-3.5-1210",
+        "temperature": 0.4,
         "messages": [
             {"role": "system", "content": context},
             {"role": "user", "content": question}
@@ -970,15 +971,15 @@ Explain the economic situation clearly.
         "Content-Type": "application/json"
     }
 
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        data = response.json()
+    
+    response = requests.post(url, json=payload, headers=headers)
 
+    data = response.json()
+
+    if "choices" in data:
         answer = data["choices"][0]["message"]["content"]
-
         st.info(answer)
-
-    except:
+    else:
         st.error("AI response failed")
 
 # ─────────────────────────────────────────────
