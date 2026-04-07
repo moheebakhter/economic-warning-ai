@@ -875,6 +875,57 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
+# 🌍 GLOBAL RECESSION TIMELINE PREDICTOR
+# ─────────────────────────────────────────────
+
+st.markdown("## 🌍 Global Recession Timeline Predictor (2026-2030)")
+
+years = ["2026","2027","2028","2029","2030"]
+
+base_prob = prob
+
+timeline_probs = [
+    base_prob,
+    min(base_prob + 5, 100),
+    min(base_prob + 10, 100),
+    min(base_prob + 8, 100),
+    min(base_prob + 6, 100)
+]
+
+forecast_df = pd.DataFrame({
+    "Year": years,
+    "Recession Probability (%)": timeline_probs
+})
+
+fig = px.line(
+    forecast_df,
+    x="Year",
+    y="Recession Probability (%)",
+    markers=True,
+    title="Global Recession Risk Timeline"
+)
+
+fig.update_layout(
+    template="plotly_dark",
+    height=400
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+future_risk = timeline_probs[-1]
+
+if future_risk > 70:
+    st.error("🚨 Long-term recession risk may increase significantly by 2030.")
+
+elif future_risk > 50:
+    st.warning("⚠ Moderate long-term recession risk projected.")
+
+else:
+    st.success("🟢 Long-term economic outlook appears relatively stable.")
+
+
+
+# ─────────────────────────────────────────────
 # 🚨 AI ECONOMIC CRISIS ALERTS
 # ─────────────────────────────────────────────
 
