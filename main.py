@@ -969,7 +969,7 @@ Explain the economic situation clearly.
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     payload = {
-        "model": "mistralai/mistral-7b-instruct",
+        "model": "meta-llama/llama-3.1-8b-instruct",
         "temperature": 0.4,
         "messages": [
             {"role": "system", "content": context},
