@@ -873,6 +873,70 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
+
+# ─────────────────────────────────────────────
+# 🚨 AI ECONOMIC CRISIS ALERTS
+# ─────────────────────────────────────────────
+
+st.markdown("## 🚨 AI Economic Crisis Alerts")
+
+alerts = []
+
+if inflation_live > 6:
+    alerts.append(("danger", "🔥 Inflation spike detected — price instability rising"))
+
+if unemployment_live > 7:
+    alerts.append(("danger", "👷 Labor market weakening — unemployment elevated"))
+
+if sp500_live < 4000:
+    alerts.append(("warning", "📉 Financial markets under pressure"))
+
+if prob > 60:
+    alerts.append(("danger", "🚨 High recession probability detected"))
+
+if prob > 40 and prob <= 60:
+    alerts.append(("warning", "⚠ Economic slowdown risk increasing"))
+
+if not alerts:
+    st.success("🟢 No immediate macroeconomic stress signals detected.")
+
+for level, text in alerts:
+
+    if level == "danger":
+        st.error(text)
+
+    elif level == "warning":
+        st.warning(text)
+
+
+# ─────────────────────────────────────────────
+# Economic Stress Score
+# ─────────────────────────────────────────────
+
+stress_score = (
+    inflation_live * 0.3 +
+    unemployment_live * 0.3 +
+    (prob/10) * 0.4
+)
+
+st.metric("Economic Stress Index", round(stress_score,2))
+
+
+if stress_score > 7:
+    st.error("🚨 System Warning: Economic conditions indicate elevated recession risk.")
+
+elif stress_score > 5:
+    st.warning("⚠ Moderate economic stress detected. Monitor indicators closely.")
+
+else:
+    st.success("🟢 Economic environment currently stable.")
+
+
+
+
+
+
+
 # ─────────────────────────────────────────────
 # ⑧ AI INSIGHTS + POLICY
 # ─────────────────────────────────────────────
