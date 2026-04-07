@@ -27,17 +27,25 @@ def get_economic_news():
 
     url = f"https://newsapi.org/v2/everything?q=economy OR inflation OR recession&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
 
-    data = requests.get(url).json()
+    try:
+        response = requests.get(url)
+        data = response.json()
 
-    articles = []
+        if "articles" not in data:
+            return []
 
-    for article in data["articles"][:5]:
-        articles.append({
-            "title": article["title"],
-            "source": article["source"]["name"]
-        })
+        articles = []
 
-    return articles
+        for article in data["articles"][:5]:
+            articles.append({
+                "title": article["title"],
+                "source": article["source"]["name"]
+            })
+
+        return articles
+
+    except:
+        return []
 
 
 def analyze_sentiment(text):
