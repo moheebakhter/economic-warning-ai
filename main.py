@@ -975,7 +975,7 @@ Explain the economic situation clearly.
     }
 
     headers = {
-        "Authorization": f"Bearer {OPENR_API_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
 
