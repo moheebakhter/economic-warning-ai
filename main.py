@@ -964,35 +964,35 @@ Recession probability: {prob}%
 Explain the economic situation clearly.
 """
 
-OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
+    OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
 
-url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://openrouter.ai/api/v1/chat/completions"
 
-payload = {
-    "model": "mistralai/mistral-7b-instruct",
-    "temperature": 0.4,
-    "messages": [
-        {"role": "system", "content": context},
-        {"role": "user", "content": question}
-    ]
-}
+    payload = {
+        "model": "mistralai/mistral-7b-instruct",
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": context},
+            {"role": "user", "content": question}
+        ]
+    }
 
-headers = {
-    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-    "Content-Type": "application/json",
-    "HTTP-Referer": "https://economic-warning-ai-moheeb.streamlit.app",
-    "X-Title": "Economic AI"
-}
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://economic-warning-ai-moheeb.streamlit.app",
+        "X-Title": "Economic AI"
+    }
 
-response = requests.post(url, json=payload, headers=headers)
+    response = requests.post(url, json=payload, headers=headers)
 
-data = response.json()
+    data = response.json()
 
-if "choices" in data:
-    answer = data["choices"][0]["message"]["content"]
-    st.info(answer)
-else:
-    st.error(data)
+    if "choices" in data:
+        answer = data["choices"][0]["message"]["content"]
+        st.info(answer)
+    else:
+        st.error(data)
 
 # ─────────────────────────────────────────────
 # Footer
