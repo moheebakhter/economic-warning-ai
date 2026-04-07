@@ -697,6 +697,39 @@ fig = px.choropleth(
 st.plotly_chart(fig, use_container_width=True)
 
 
+
+st.markdown("## 🌍 Global Economic Stress Heatmap")
+
+countries = ["USA","China","Germany","India","Japan","UK","Brazil","France"]
+
+stress_values = [
+    prob,
+    prob * 0.9,
+    prob * 1.1,
+    prob * 0.8,
+    prob * 0.95,
+    prob * 1.05,
+    prob * 0.85,
+    prob * 1.0
+]
+
+heat_df = pd.DataFrame({
+    "country": countries,
+    "stress": stress_values
+})
+
+fig = px.choropleth(
+    heat_df,
+    locations="country",
+    locationmode="country names",
+    color="stress",
+    color_continuous_scale="Reds",
+    title="Global Economic Stress Levels"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
 # ⑨ AI ECONOMIC NEWS ANALYZER
 # ─────────────────────────────────────────────
 
@@ -985,7 +1018,20 @@ else:
 
 
 
+st.markdown("## 🧠 Economic System Health Score")
 
+health = 100 - stress_score * 5
+
+st.metric("Global Economic Health", round(health,1))
+
+if health < 40:
+    st.error("🚨 Global economy under severe stress")
+
+elif health < 60:
+    st.warning("⚠ Economic conditions weakening")
+
+else:
+    st.success("🟢 Global economy stable")
 
 
 # ─────────────────────────────────────────────
