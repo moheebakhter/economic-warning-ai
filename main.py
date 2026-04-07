@@ -700,17 +700,26 @@ st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("## 🌍 Global Economic Stress Heatmap")
 
-countries = ["USA","China","Germany","India","Japan","UK","Brazil","France"]
+countries = [
+    "United States",
+    "China",
+    "Germany",
+    "India",
+    "Japan",
+    "United Kingdom",
+    "France",
+    "Brazil"
+]
 
 stress_values = [
-    prob,
-    prob * 0.9,
-    prob * 1.1,
-    prob * 0.8,
-    prob * 0.95,
-    prob * 1.05,
-    prob * 0.85,
-    prob * 1.0
+    stress_score,
+    stress_score * 0.9,
+    stress_score * 1.1,
+    stress_score * 0.8,
+    stress_score * 0.95,
+    stress_score * 1.05,
+    stress_score * 1.0,
+    stress_score * 0.85
 ]
 
 heat_df = pd.DataFrame({
@@ -723,7 +732,7 @@ fig = px.choropleth(
     locations="country",
     locationmode="country names",
     color="stress",
-    color_continuous_scale="Reds",
+    color_continuous_scale="OrRd",
     title="Global Economic Stress Levels"
 )
 
