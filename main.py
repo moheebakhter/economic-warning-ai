@@ -698,6 +698,13 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 
+# Calculate stress score BEFORE heatmap
+stress_score = (
+    inflation_live * 0.3 +
+    unemployment_live * 0.3 +
+    (prob / 10) * 0.4
+)
+
 st.markdown("## 🌍 Global Economic Stress Heatmap")
 
 countries = [
@@ -1006,11 +1013,11 @@ for level, text in alerts:
 # Economic Stress Score
 # ─────────────────────────────────────────────
 
-stress_score = (
-    inflation_live * 0.3 +
-    unemployment_live * 0.3 +
-    (prob/10) * 0.4
-)
+# stress_score = (
+#     inflation_live * 0.3 +
+#     unemployment_live * 0.3 +
+#     (prob/10) * 0.4
+# )
 
 st.metric("Economic Stress Index", round(stress_score,2))
 
