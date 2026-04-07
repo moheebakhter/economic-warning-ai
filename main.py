@@ -961,7 +961,7 @@ Recession probability: {prob}%
 Explain the economic situation clearly.
 """
 
-    OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+    OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
 
     url = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -975,7 +975,7 @@ Explain the economic situation clearly.
     }
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {OPENR_API_KEY}",
         "Content-Type": "application/json"
     }
 
