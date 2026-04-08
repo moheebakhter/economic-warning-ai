@@ -924,6 +924,46 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
+# 🌍 GLOBAL ECONOMIC CONTAGION SIMULATOR
+# ─────────────────────────────────────────────
+
+st.markdown("## 🌍 Global Economic Contagion Simulator")
+
+us_risk = prob
+
+europe_impact = us_risk * 0.8
+china_impact = us_risk * 0.7
+emerging_impact = us_risk * 0.9
+
+contagion_df = pd.DataFrame({
+    "Region": ["United States", "Europe", "China", "Emerging Markets"],
+    "Recession Impact": [us_risk, europe_impact, china_impact, emerging_impact]
+})
+
+fig = px.bar(
+    contagion_df,
+    x="Region",
+    y="Recession Impact",
+    color="Recession Impact",
+    color_continuous_scale="Reds",
+    title="Global Economic Contagion Risk"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+if us_risk > 60:
+    st.error("🚨 High probability of global economic contagion if US recession occurs.")
+
+elif us_risk > 40:
+    st.warning("⚠ Moderate global economic spillover risk.")
+
+else:
+    st.success("🟢 Global contagion risk currently limited.")
+
+
+
+
+# ─────────────────────────────────────────────
 # 🌍 GLOBAL RECESSION TIMELINE PREDICTOR
 # ─────────────────────────────────────────────
 
