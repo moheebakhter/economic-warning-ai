@@ -976,39 +976,98 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 # 🌍 GLOBAL ECONOMIC CONTAGION SIMULATOR
 # ─────────────────────────────────────────────
 
+# st.markdown("## 🌍 Global Economic Contagion Simulator")
+
+# us_risk = prob
+
+# europe_impact = us_risk * 0.8
+# china_impact = us_risk * 0.7
+# emerging_impact = us_risk * 0.9
+
+# contagion_df = pd.DataFrame({
+#     "Region": ["United States", "Europe", "China", "Emerging Markets"],
+#     "Recession Impact": [us_risk, europe_impact, china_impact, emerging_impact]
+# })
+
+# fig = px.bar(
+#     contagion_df,
+#     x="Region",
+#     y="Recession Impact",
+#     color="Recession Impact",
+#     color_continuous_scale="Reds",
+#     title="Global Economic Contagion Risk"
+# )
+
+# st.plotly_chart(fig, use_container_width=True)
+
+# if us_risk > 60:
+#     st.error("🚨 High probability of global economic contagion if US recession occurs.")
+
+# elif us_risk > 40:
+#     st.warning("⚠ Moderate global economic spillover risk.")
+
+# else:
+#     st.success("🟢 Global contagion risk currently limited.")
+
+
+
+# ─────────────────────────────────────────────
+# 🌍 GLOBAL ECONOMIC CONTAGION SIMULATOR
+# ─────────────────────────────────────────────
+
 st.markdown("## 🌍 Global Economic Contagion Simulator")
+
+st.markdown(
+"""
+This simulator estimates how a recession in a major economy like the United States
+may spread across global regions through trade, financial markets, and supply chains.
+"""
+)
 
 us_risk = prob
 
-europe_impact = us_risk * 0.8
-china_impact = us_risk * 0.7
-emerging_impact = us_risk * 0.9
+regions = [
+    "United States",
+    "Europe",
+    "China",
+    "Japan",
+    "Emerging Markets"
+]
+
+impact = [
+    us_risk,
+    us_risk * 0.85,
+    us_risk * 0.75,
+    us_risk * 0.65,
+    us_risk * 0.9
+]
 
 contagion_df = pd.DataFrame({
-    "Region": ["United States", "Europe", "China", "Emerging Markets"],
-    "Recession Impact": [us_risk, europe_impact, china_impact, emerging_impact]
+    "Region": regions,
+    "Recession Impact (%)": impact
 })
 
 fig = px.bar(
     contagion_df,
     x="Region",
-    y="Recession Impact",
-    color="Recession Impact",
+    y="Recession Impact (%)",
+    color="Recession Impact (%)",
     color_continuous_scale="Reds",
-    title="Global Economic Contagion Risk"
+    title="Global Recession Contagion Simulation"
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-if us_risk > 60:
-    st.error("🚨 High probability of global economic contagion if US recession occurs.")
+avg_impact = np.mean(impact)
 
-elif us_risk > 40:
+if avg_impact > 60:
+    st.error("🚨 High probability of global recession contagion.")
+
+elif avg_impact > 40:
     st.warning("⚠ Moderate global economic spillover risk.")
 
 else:
-    st.success("🟢 Global contagion risk currently limited.")
-
+    st.success("🟢 Limited global contagion risk.")
 
 
 
