@@ -443,7 +443,13 @@ df["stress_score"] = (
 
 X = df[["inflation","unemployment","sp500","consumer_confidence"]]
 
-y = (df["stress_score"] > 5).astype(int)
+# y = (df["stress_score"] > 5).astype(int)
+
+threshold = df["stress_score"].median()
+
+y = (df["stress_score"] > threshold).astype(int)
+
+st.write("Training classes:", y.value_counts())
 
 recession_model = LogisticRegression()
 recession_model.fit(X,y)
