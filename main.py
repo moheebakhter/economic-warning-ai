@@ -1260,6 +1260,61 @@ Explain the economic situation clearly.
     else:
         st.error(data)
 
+
+# ─────────────────────────────────────────────
+# 🧠 AI DASHBOARD EXPLAINER
+# ─────────────────────────────────────────────
+
+st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+st.markdown("## 🧠 Explain This Dashboard")
+
+if st.button("Explain Economic Dashboard"):
+
+    context = f"""
+You are an AI macroeconomic analyst.
+
+Explain the economic dashboard based on these indicators:
+
+Inflation: {inflation_live}
+Unemployment: {unemployment_live}
+S&P 500: {sp500_live}
+Consumer Confidence: {confidence_live}
+Recession Probability: {prob}%
+
+Explain what these indicators mean for the economy.
+Keep explanation simple and professional.
+"""
+
+    OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    payload = {
+        "model": "openchat/openchat-3.5-1210",
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": context},
+            {"role": "user", "content": "Explain the current economic dashboard"}
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+
+    if "choices" in data:
+        explanation = data["choices"][0]["message"]["content"]
+        st.info(explanation)
+    else:
+        st.error("AI explanation failed")
+
+
+
+
 # ─────────────────────────────────────────────
 # Footer
 # ─────────────────────────────────────────────
