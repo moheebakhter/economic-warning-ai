@@ -806,47 +806,47 @@ health_score = 100 - prob
 # 🧠 AI POLICY DECISION SIMULATOR
 # ─────────────────────────────────────────────
 
-# st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-# st.markdown("## 🧠 AI Policy Decision Simulator")
+st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+st.markdown("## 🧠 AI Policy Decision Simulator")
 
-# policy = st.selectbox(
-#     "Select Economic Policy Decision",
-#     [
-#         "Interest Rate Cut",
-#         "Stimulus Package",
-#         "Tax Increase"
-#     ]
-# )
+policy = st.selectbox(
+    "Select Economic Policy Decision",
+    [
+        "Interest Rate Cut",
+        "Stimulus Package",
+        "Tax Increase"
+    ]
+)
 
-# if policy == "Interest Rate Cut":
+if policy == "Interest Rate Cut":
 
-#     gdp_change = "+1.2%"
-#     inflation_change = "+0.8%"
-#     recession_change = "-10%"
+    gdp_change = "+1.2%"
+    inflation_change = "+0.8%"
+    recession_change = "-10%"
 
-#     st.success("Lower interest rates stimulate borrowing and investment.")
+    st.success("Lower interest rates stimulate borrowing and investment.")
 
-# elif policy == "Stimulus Package":
+elif policy == "Stimulus Package":
 
-#     gdp_change = "+1.8%"
-#     inflation_change = "+1.2%"
-#     recession_change = "-15%"
+    gdp_change = "+1.8%"
+    inflation_change = "+1.2%"
+    recession_change = "-15%"
 
-#     st.success("Government spending boosts economic demand.")
+    st.success("Government spending boosts economic demand.")
 
-# elif policy == "Tax Increase":
+elif policy == "Tax Increase":
 
-#     gdp_change = "-0.7%"
-#     inflation_change = "-0.3%"
-#     recession_change = "+8%"
+    gdp_change = "-0.7%"
+    inflation_change = "-0.3%"
+    recession_change = "+8%"
 
-#     st.warning("Higher taxes may slow economic growth.")
+    st.warning("Higher taxes may slow economic growth.")
 
-# col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-# col1.metric("GDP Impact", gdp_change)
-# col2.metric("Inflation Impact", inflation_change)
-# col3.metric("Recession Risk Impact", recession_change)
+col1.metric("GDP Impact", gdp_change)
+col2.metric("Inflation Impact", inflation_change)
+col3.metric("Recession Risk Impact", recession_change)
 
 
 
