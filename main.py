@@ -1290,7 +1290,7 @@ Keep explanation simple and professional.
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     payload = {
-        "model": "openchat/openchat-3.5-1210",
+        "model": "meta-llama/llama-3.1-8b-instruct",
         "temperature": 0.4,
         "messages": [
             {"role": "system", "content": context},
