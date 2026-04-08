@@ -85,6 +85,21 @@ def get_fred(series_id):
         st.warning(f"FRED API error for {series_id}")
         return 0
 
+def get_fred_series(series_id):
+
+    url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json"
+
+    data = requests.get(url).json()
+
+    values = []
+
+    for obs in data["observations"]:
+        if obs["value"] != ".":
+            values.append(float(obs["value"]))
+
+    return values[-200:]
+
+
 st.set_page_config(
     page_title="AI Economic Early Warning System",
     page_icon="📉",
@@ -387,14 +402,42 @@ html, body, [class*="css"] {
 # ─────────────────────────────────────────────
 # DATASET (unchanged)
 # ─────────────────────────────────────────────
-data = {
-    "inflation":           [2.1, 2.3, 3.0, 4.5, 5.2, 6.1, 7.4],
-    "unemployment":        [4.1, 4.3, 5.0, 6.1, 7.2, 7.8, 8.2],
-    "sp500":               [4200, 4100, 3900, 3700, 3500, 3300, 3100],
-    "consumer_confidence": [110, 105, 100, 95, 90, 85, 80],
-    "stress_score":        [0.27, 1.43, 2.96, 4.89, 6.58, 8.13, 9.72]
-}
-df = pd.DataFrame(data)
+# data = {
+#     "inflation":           [2.1, 2.3, 3.0, 4.5, 5.2, 6.1, 7.4],
+#     "unemployment":        [4.1, 4.3, 5.0, 6.1, 7.2, 7.8, 8.2],
+#     "sp500":               [4200, 4100, 3900, 3700, 3500, 3300, 3100],
+#     "consumer_confidence": [110, 105, 100, 95, 90, 85, 80],
+#     "stress_score":        [0.27, 1.43, 2.96, 4.89, 6.58, 8.13, 9.72]
+# }
+# df = pd.DataFrame(data)
+
+
+inflation_hist = get_fred_series("CPIAUCSL")
+unemployment_hist = get_fred_series("UNRATE")
+sp500_hist = get_fred_series("SP500")
+confidence_hist = get_fred_series("UMCSENT")
+
+min_len = min(len(inflation_hist), len(unemployment_hist), len(sp500_hist), len(confidence_hist))
+
+inflation_hist = inflation_hist[-min_len:]
+unemployment_hist = unemployment_hist[-min_len:]
+sp500_hist = sp500_hist[-min_len:]
+confidence_hist = confidence_hist[-min_len:]
+
+df = pd.DataFrame({
+    "inflation": inflation_hist,
+    "unemployment": unemployment_hist,
+    "sp500": sp500_hist,
+    "consumer_confidence": confidence_hist
+})
+
+df["stress_score"] = (
+    df["inflation"] * 0.3 +
+    df["unemployment"] * 0.4 +
+    (df["sp500"].max() - df["sp500"]) * 0.0001 +
+    (100 - df["consumer_confidence"]) * 0.2
+)
+
 
 # AI recession model training
 
