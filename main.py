@@ -441,18 +441,23 @@ df["stress_score"] = (
 
 # AI recession model training
 
-X = df[["inflation","unemployment","sp500","consumer_confidence"]]
+@st.cache_resource
+def train_model(df):
 
-# y = (df["stress_score"] > 5).astype(int)
+    X = df[["inflation","unemployment","sp500","consumer_confidence"]]
 
-threshold = df["stress_score"].median()
+    threshold = df["stress_score"].median()
 
-y = (df["stress_score"] > threshold).astype(int)
+    y = (df["stress_score"] > threshold).astype(int)
 
-# st.write("Training classes:", y.value_counts())
+    model = LogisticRegression()
 
-recession_model = LogisticRegression()
-recession_model.fit(X,y)
+    model.fit(X,y)
+
+    return model
+
+
+recession_model = train_model(df)
 
 inflation_live = get_fred("CPIAUCSL")
 unemployment_live = get_fred("UNRATE")
