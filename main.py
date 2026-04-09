@@ -8,7 +8,9 @@ import requests
 import re
 import os
 # import google.generativeai as genai
-from sklearn.linear_model import LogisticRegression
+# from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
 
 
 # genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -431,11 +433,31 @@ df = pd.DataFrame({
     "consumer_confidence": confidence_hist
 })
 
+# df["stress_score"] = (
+#     df["inflation"] * 0.3 +
+#     df["unemployment"] * 0.4 +
+#     (df["sp500"].max() - df["sp500"]) * 0.0001 +
+#     (100 - df["consumer_confidence"]) * 0.2
+# )
+
+
+
+scaler = StandardScaler()
+
+scaled = scaler.fit_transform(
+    df[["inflation","unemployment","sp500","consumer_confidence"]]
+)
+
+scaled_df = pd.DataFrame(
+    scaled,
+    columns=["inflation","unemployment","sp500","consumer_confidence"]
+)
+
 df["stress_score"] = (
-    df["inflation"] * 0.3 +
-    df["unemployment"] * 0.4 +
-    (df["sp500"].max() - df["sp500"]) * 0.0001 +
-    (100 - df["consumer_confidence"]) * 0.2
+    scaled_df["inflation"] +
+    scaled_df["unemployment"] -
+    scaled_df["sp500"] -
+    scaled_df["consumer_confidence"]
 )
 
 
@@ -450,7 +472,11 @@ def train_model(df):
 
     y = (df["stress_score"] > threshold).astype(int)
 
-    model = LogisticRegression()
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=6,
+        random_state=42
+    )
 
     model.fit(X,y)
 
