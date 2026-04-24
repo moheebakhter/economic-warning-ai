@@ -353,9 +353,9 @@ def call_llm(system_prompt: str, user_msg: str, temperature: float = 0.45) -> st
                 "X-Title":       "Economic AI",
             },
             json={
-                "model":       "meta-llama/llama-3.1-8b-instruct",
+                "model":       "mistralai/mixtral-8x7b"",
                 "temperature": temperature,
-                "max_tokens":  480,
+                "max_tokens":  600,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user",   "content": user_msg},
