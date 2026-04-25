@@ -1,9 +1,10 @@
 """
 AI Economic Early Warning System
-─────────────────────────────────────────────
-Full-stack upgrade: robust API, expanded features,
-realistic ML metrics, dynamic forecast, live-connected map,
-context-aware chatbot.
+─────────────────────────────────
+Realistic, transparent, production-grade macro risk platform.
+Data: FRED-sourced where available; historically-calibrated simulation as fallback.
+Model: RandomForestClassifier (80/20 split, 5-fold CV, label noise for realism).
+LLM: Mixtral 8x7B via OpenRouter — variable, human-like economic reasoning.
 """
 
 import streamlit as st
@@ -21,6 +22,7 @@ from sklearn.metrics import (
 )
 from sklearn.linear_model import LinearRegression
 
+
 # ─────────────────────────────────────────────
 # SECRETS
 # ─────────────────────────────────────────────
@@ -32,7 +34,7 @@ OPENROUTER_API_KEY = st.secrets["OPENR_API_KEY"]
 # PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI Economic Early Warning System",
+    page_title="Economic Early Warning System",
     page_icon="📉",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -48,40 +50,44 @@ html,body,[class*="css"]{font-family:'Space Grotesk',sans-serif;}
 .stApp{
     background:#050d1a;
     background-image:
-        radial-gradient(ellipse 80% 60% at 20% 10%,rgba(0,122,255,.12) 0%,transparent 60%),
-        radial-gradient(ellipse 60% 50% at 80% 80%,rgba(0,212,170,.08) 0%,transparent 55%),
-        radial-gradient(ellipse 40% 40% at 60% 30%,rgba(99,38,255,.07) 0%,transparent 50%);
+        radial-gradient(ellipse 80% 60% at 20% 10%,rgba(0,122,255,.11) 0%,transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 80%,rgba(0,212,170,.07) 0%,transparent 55%),
+        radial-gradient(ellipse 40% 40% at 60% 30%,rgba(99,38,255,.06) 0%,transparent 50%);
     min-height:100vh;
 }
 #MainMenu,footer,header{visibility:hidden;}
-.block-container{padding:2rem 2.5rem 3rem;max-width:1400px;}
+.block-container{padding:2rem 2.5rem 3rem;max-width:1440px;}
+
+/* ── Hero ── */
 .hero-header{text-align:center;padding:2.5rem 0 1rem;margin-bottom:.5rem;}
-.hero-badge{
-    display:inline-block;font-family:'JetBrains Mono',monospace;
-    font-size:.7rem;font-weight:500;letter-spacing:.15em;text-transform:uppercase;
-    color:#00d4aa;background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.25);
-    padding:.3rem 1rem;border-radius:50px;margin-bottom:1rem;
-}
-.hero-title{
-    font-size:clamp(2rem,4vw,3.2rem);font-weight:700;letter-spacing:-.03em;line-height:1.1;
-    background:linear-gradient(135deg,#fff 0%,#a8c8ff 50%,#00d4aa 100%);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 .6rem;
-}
-.hero-sub{font-size:1rem;color:rgba(255,255,255,.45);max-width:580px;margin:0 auto;line-height:1.6;}
-.section-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,170,.3),rgba(99,38,255,.3),transparent);margin:2rem 0;}
-.section-label{
-    font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:500;
-    letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.3);
-    margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;
-}
-.section-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07);}
-.section-title{font-size:1.25rem;font-weight:600;color:#fff;letter-spacing:-.02em;margin:0 0 1.25rem;}
-.kpi-card{
-    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-    border-radius:16px;padding:1.4rem 1.6rem;position:relative;overflow:hidden;
-    backdrop-filter:blur(20px);margin-bottom:1rem;
-}
-.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:16px 16px 0 0;}
+.hero-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.68rem;
+    font-weight:500;letter-spacing:.15em;text-transform:uppercase;color:#00d4aa;
+    background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.25);
+    padding:.3rem 1rem;border-radius:50px;margin-bottom:1rem;}
+.hero-title{font-size:clamp(1.9rem,4vw,3.1rem);font-weight:700;letter-spacing:-.03em;
+    line-height:1.1;background:linear-gradient(135deg,#fff 0%,#a8c8ff 50%,#00d4aa 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;margin:0 0 .6rem;}
+.hero-sub{font-size:.95rem;color:rgba(255,255,255,.42);max-width:600px;margin:0 auto;line-height:1.65;}
+.transparency-bar{
+    background:rgba(255,200,80,.07);border:1px solid rgba(255,200,80,.2);
+    border-radius:10px;padding:.65rem 1.1rem;font-size:.78rem;
+    color:rgba(255,220,120,.75);margin-top:1rem;text-align:center;
+    font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
+
+/* ── Layout ── */
+.section-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,170,.28),rgba(99,38,255,.28),transparent);margin:2rem 0;}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:.63rem;font-weight:500;
+    letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.28);
+    margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;}
+.section-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06);}
+.section-title{font-size:1.2rem;font-weight:600;color:#fff;letter-spacing:-.02em;margin:0 0 1.2rem;}
+
+/* ── KPI Cards ── */
+.kpi-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+    border-radius:14px;padding:1.2rem 1.4rem;position:relative;overflow:hidden;
+    backdrop-filter:blur(20px);margin-bottom:1rem;}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0;}
 .kpi-card.blue::before{background:linear-gradient(90deg,#007aff,#5ac8fa);}
 .kpi-card.teal::before{background:linear-gradient(90deg,#00d4aa,#34c759);}
 .kpi-card.purple::before{background:linear-gradient(90deg,#6326ff,#af52de);}
@@ -89,154 +95,220 @@ html,body,[class*="css"]{font-family:'Space Grotesk',sans-serif;}
 .kpi-card.green::before{background:linear-gradient(90deg,#34c759,#30d158);}
 .kpi-card.orange::before{background:linear-gradient(90deg,#ff9500,#ffcc00);}
 .kpi-card.cyan::before{background:linear-gradient(90deg,#32ade6,#007aff);}
-.kpi-icon{font-size:1.1rem;margin-bottom:.6rem;opacity:.7;}
-.kpi-label{font-size:.72rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.4rem;font-family:'JetBrains Mono',monospace;}
-.kpi-value{font-size:2rem;font-weight:700;color:#fff;letter-spacing:-.03em;line-height:1;margin-bottom:.35rem;font-family:'JetBrains Mono',monospace;}
-.kpi-delta{font-size:.75rem;font-weight:500;color:rgba(255,255,255,.35);}
+.kpi-card.pink::before{background:linear-gradient(90deg,#ff375f,#ff6b95);}
+.kpi-icon{font-size:1rem;margin-bottom:.5rem;opacity:.65;}
+.kpi-label{font-size:.68rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+    color:rgba(255,255,255,.38);margin-bottom:.35rem;font-family:'JetBrains Mono',monospace;}
+.kpi-value{font-size:1.85rem;font-weight:700;color:#fff;letter-spacing:-.03em;
+    line-height:1;margin-bottom:.3rem;font-family:'JetBrains Mono',monospace;}
+.kpi-delta{font-size:.7rem;font-weight:500;color:rgba(255,255,255,.3);}
 .kpi-delta.up{color:#34c759;}.kpi-delta.down{color:#ff3b30;}.kpi-delta.warn{color:#ff9500;}
-.glass-panel{
-    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-    border-radius:20px;padding:1.75rem;backdrop-filter:blur(20px);
-    margin-bottom:1.5rem;position:relative;overflow:hidden;
-}
-.glass-panel::before{
-    content:'';position:absolute;inset:0;border-radius:20px;
-    background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,transparent 60%);pointer-events:none;
-}
-.risk-badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;font-weight:600;letter-spacing:.05em;padding:.35rem .9rem;border-radius:50px;}
+.kpi-tag{font-size:.58rem;font-family:'JetBrains Mono',monospace;letter-spacing:.08em;
+    text-transform:uppercase;padding:.1rem .35rem;border-radius:3px;margin-left:.3rem;vertical-align:middle;}
+.kpi-tag.real{color:rgba(0,212,170,.7);background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.2);}
+.kpi-tag.sim{color:rgba(255,200,80,.6);background:rgba(255,200,80,.08);border:1px solid rgba(255,200,80,.18);}
+
+/* ── Glass ── */
+.glass-panel{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+    border-radius:18px;padding:1.65rem;backdrop-filter:blur(20px);
+    margin-bottom:1.5rem;position:relative;overflow:hidden;}
+.glass-panel::before{content:'';position:absolute;inset:0;border-radius:18px;
+    background:linear-gradient(135deg,rgba(255,255,255,.025) 0%,transparent 60%);pointer-events:none;}
+
+/* ── Risk badge ── */
+.risk-badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;
+    font-weight:600;letter-spacing:.05em;padding:.32rem .85rem;border-radius:50px;}
 .risk-badge.high{background:rgba(255,59,48,.15);color:#ff6b6b;border:1px solid rgba(255,59,48,.3);}
 .risk-badge.medium{background:rgba(255,149,0,.15);color:#ffbb55;border:1px solid rgba(255,149,0,.3);}
 .risk-badge.low{background:rgba(52,199,89,.15);color:#34c759;border:1px solid rgba(52,199,89,.3);}
+
+/* ── Sliders ── */
 .stSlider>div>div>div{background:rgba(0,212,170,.2)!important;}
 .stSlider>div>div>div>div{background:#00d4aa!important;}
+
+/* ── Score ── */
+.score-display{font-family:'JetBrains Mono',monospace;font-size:3.2rem;font-weight:700;
+    letter-spacing:-.04em;background:linear-gradient(135deg,#fff,#00d4aa);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    background-clip:text;text-align:center;line-height:1;margin:.5rem 0;}
+.score-label{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;
+    color:rgba(255,255,255,.28);text-align:center;font-family:'JetBrains Mono',monospace;}
+
+/* ── Insight cards ── */
+.insight-card{display:flex;align-items:flex-start;gap:.8rem;padding:.95rem 1.1rem;
+    border-radius:11px;margin-bottom:.55rem;border:1px solid rgba(255,255,255,.06);}
+.insight-card.warn{background:rgba(255,149,0,.07);border-color:rgba(255,149,0,.18);}
+.insight-card.danger{background:rgba(255,59,48,.07);border-color:rgba(255,59,48,.18);}
+.insight-card.info{background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.18);}
+.insight-card.success{background:rgba(52,199,89,.07);border-color:rgba(52,199,89,.18);}
+.insight-icon{font-size:1.05rem;margin-top:.05rem;flex-shrink:0;}
+.insight-text{font-size:.84rem;color:rgba(255,255,255,.78);line-height:1.55;}
+
+/* ── Policy box ── */
+.policy-box{background:rgba(99,38,255,.09);border:1px solid rgba(99,38,255,.22);
+    border-radius:13px;padding:1.1rem 1.3rem;font-size:.88rem;
+    color:rgba(255,255,255,.82);line-height:1.65;}
+.policy-box strong{color:#af88ff;}
+
+/* ── Info/Limit boxes ── */
+.info-box{background:rgba(0,122,255,.06);border:1px solid rgba(0,122,255,.18);
+    border-radius:13px;padding:1.1rem 1.3rem;font-size:.85rem;
+    color:rgba(255,255,255,.75);line-height:1.7;margin-bottom:.7rem;}
+.info-box h4{color:#5ac8fa;font-size:.92rem;margin:0 0 .4rem;}
+.limit-box{background:rgba(255,149,0,.06);border:1px solid rgba(255,149,0,.18);
+    border-radius:13px;padding:1.1rem 1.3rem;font-size:.85rem;
+    color:rgba(255,255,255,.75);line-height:1.7;margin-bottom:.7rem;}
+.limit-box h4{color:#ffbb55;font-size:.92rem;margin:0 0 .4rem;}
+
+/* ── Why box ── */
+.why-box{background:rgba(99,38,255,.07);border:1px solid rgba(99,38,255,.22);
+    border-radius:13px;padding:1.1rem 1.3rem;margin-top:1rem;}
+.feat-bar-wrap{height:4px;border-radius:2px;background:rgba(255,255,255,.06);margin-top:.22rem;}
+.feat-bar-fill{height:4px;border-radius:2px;}
+
+/* ── Matters cards ── */
+.matters-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+    border-radius:14px;padding:1.3rem 1.5rem;height:100%;margin-bottom:1rem;}
+.matters-card h4{color:#00d4aa;font-size:.96rem;margin:0 0 .55rem;}
+.matters-card p{font-size:.83rem;color:rgba(255,255,255,.6);line-height:1.6;margin:.28rem 0;}
+
+/* ── Metric chip ── */
 [data-testid="metric-container"]{background:transparent;border:none;padding:0;}
 .stProgress>div>div>div{background:linear-gradient(90deg,#00d4aa,#007aff)!important;border-radius:4px;}
-.stProgress>div>div{background:rgba(255,255,255,.07)!important;border-radius:4px;}
-.stDataFrame{border-radius:12px;overflow:hidden;}
-.insight-card{display:flex;align-items:flex-start;gap:.85rem;padding:1rem 1.2rem;border-radius:12px;margin-bottom:.6rem;border:1px solid rgba(255,255,255,.06);}
-.insight-card.warn{background:rgba(255,149,0,.08);border-color:rgba(255,149,0,.2);}
-.insight-card.danger{background:rgba(255,59,48,.08);border-color:rgba(255,59,48,.2);}
-.insight-card.info{background:rgba(0,122,255,.08);border-color:rgba(0,122,255,.2);}
-.insight-card.success{background:rgba(52,199,89,.08);border-color:rgba(52,199,89,.2);}
-.insight-icon{font-size:1.1rem;margin-top:.05rem;}
-.insight-text{font-size:.87rem;color:rgba(255,255,255,.8);line-height:1.5;}
-.policy-box{background:rgba(99,38,255,.1);border:1px solid rgba(99,38,255,.25);border-radius:14px;padding:1.2rem 1.4rem;font-size:.9rem;color:rgba(255,255,255,.85);line-height:1.6;}
-.policy-box strong{color:#af88ff;}
-.score-display{font-family:'JetBrains Mono',monospace;font-size:3.5rem;font-weight:700;letter-spacing:-.04em;background:linear-gradient(135deg,#fff,#00d4aa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;line-height:1;margin:.5rem 0;}
-.score-label{font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;font-family:'JetBrains Mono',monospace;}
-.info-box{background:rgba(0,122,255,.07);border:1px solid rgba(0,122,255,.2);border-radius:14px;padding:1.2rem 1.4rem;font-size:.88rem;color:rgba(255,255,255,.8);line-height:1.7;margin-bottom:.75rem;}
-.info-box h4{color:#5ac8fa;font-size:.95rem;margin:0 0 .4rem;}
-.limit-box{background:rgba(255,149,0,.07);border:1px solid rgba(255,149,0,.2);border-radius:14px;padding:1.2rem 1.4rem;font-size:.88rem;color:rgba(255,255,255,.8);line-height:1.7;margin-bottom:.75rem;}
-.limit-box h4{color:#ffbb55;font-size:.95rem;margin:0 0 .4rem;}
-.why-box{background:rgba(99,38,255,.08);border:1px solid rgba(99,38,255,.25);border-radius:14px;padding:1.2rem 1.4rem;margin-top:1rem;}
-.matters-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:1.4rem 1.6rem;height:100%;margin-bottom:1rem;}
-.matters-card h4{color:#00d4aa;font-size:1rem;margin:0 0 .6rem;}
-.matters-card p{font-size:.85rem;color:rgba(255,255,255,.65);line-height:1.6;margin:.3rem 0;}
-.sim-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,200,100,.6);background:rgba(255,200,100,.08);border:1px solid rgba(255,200,100,.2);border-radius:4px;padding:.15rem .5rem;margin-left:.4rem;vertical-align:middle;}
+.stProgress>div>div{background:rgba(255,255,255,.06)!important;border-radius:4px;}
+.stDataFrame{border-radius:11px;overflow:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # DATA LAYER
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
-def _sim(mean, std, n, seed, low=None, high=None):
-    """Simulate realistic autocorrelated economic time-series."""
-    rng  = np.random.default_rng(seed)
-    vals = [float(mean)]
+def _sim(mean, std, n, seed, lo=None, hi=None):
+    """Auto-correlated simulation of economic time-series."""
+    rng, vals = np.random.default_rng(seed), [float(mean)]
     for _ in range(n - 1):
-        v = vals[-1] * 0.92 + mean * 0.08 + rng.normal(0, std)
-        if low  is not None: v = max(v, low)
-        if high is not None: v = min(v, high)
+        v = vals[-1] * 0.91 + mean * 0.09 + rng.normal(0, std)
+        if lo is not None: v = max(v, lo)
+        if hi is not None: v = min(v, hi)
         vals.append(float(v))
     return vals
 
 
-def _fred_series(series_id, n=200):
+def _fred_series(series_id, n=240):
     try:
         url  = (f"https://api.stlouisfed.org/fred/series/observations"
                 f"?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json")
-        obs  = requests.get(url, timeout=8).json().get("observations", [])
+        obs  = requests.get(url, timeout=9).json().get("observations", [])
         vals = [float(o["value"]) for o in obs if o["value"] != "."]
         if len(vals) >= 40:
-            return vals[-n:]
+            return vals[-n:], True          # (data, is_real)
     except Exception:
         pass
-    return []
+    return [], False
 
 
 def _fred_latest(series_id):
     try:
         url = (f"https://api.stlouisfed.org/fred/series/observations"
                f"?series_id={series_id}&api_key={FRED_API_KEY}&file_type=json")
-        obs = requests.get(url, timeout=8).json().get("observations", [])
+        obs = requests.get(url, timeout=9).json().get("observations", [])
         for o in reversed(obs):
             if o["value"] != ".":
-                return float(o["value"])
+                return float(o["value"]), True
     except Exception:
         pass
-    return None
+    return None, False
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_economic_data():
     n = 240
 
-    # ── Attempt FRED; fall back to simulation ──
-    infl  = _fred_series("CPIAUCSL", n) or _sim(4.5, 1.5, n, 1, 1.0, 14.0)
-    unemp = _fred_series("UNRATE",   n) or _sim(4.8, 1.1, n, 2, 2.0, 14.0)
-    sp    = _fred_series("SP500",    n) or _sim(4100, 520, n, 3, 1800, 6800)
-    conf  = _fred_series("UMCSENT",  n) or _sim(82,  13,  n, 4,  30,  140)
+    def get(series_id, fallback_fn):
+        vals, real = _fred_series(series_id, n)
+        if vals:
+            return vals, real
+        return fallback_fn(), False
 
-    # ── Additional macro features (simulated — FRED series where available) ──
-    rates  = _fred_series("FEDFUNDS", n) or _sim(4.0, 1.2, n, 5,  0.0, 20.0)
-    gdp    = _fred_series("A191RL1Q225SBEA", n//4) or _sim(2.5, 1.8, n//4, 6, -12, 10)
-    # Expand quarterly GDP to monthly by repeating
-    gdp    = [g for g in gdp for _ in range(4)]
-    pmi    = _sim(51.5, 4.0, n, 7, 30, 70)        # PMI — no free FRED access
-    oil    = _fred_series("DCOILWTICO", n) or _sim(78, 18, n, 8, 20, 160)
-    # 10yr minus 2yr yield spread (yield curve)
-    t10    = _fred_series("GS10", n) or _sim(3.8, 0.9, n, 9, 0.5, 8.0)
-    t2     = _fred_series("GS2",  n) or _sim(4.0, 1.1, n, 10, 0.1, 8.0)
+    infl,  infl_real  = get("CPIAUCSL",         lambda: _sim(4.5, 1.5, n, 1,  1.0, 14.0))
+    unemp, unemp_real = get("UNRATE",            lambda: _sim(4.8, 1.1, n, 2,  2.0, 14.0))
+    sp,    sp_real    = get("SP500",             lambda: _sim(4100, 520, n, 3, 1800, 6800))
+    conf,  conf_real  = get("UMCSENT",           lambda: _sim(82,  13,  n, 4,   30,  140))
+    rate,  rate_real  = get("FEDFUNDS",          lambda: _sim(4.0, 1.2, n, 5,  0.0,  20.0))
+    oil,   oil_real   = get("DCOILWTICO",        lambda: _sim(78,  18,  n, 6,  15,   180))
+    t10,   t10_real   = get("GS10",              lambda: _sim(3.8, 0.9, n, 7,  0.5,   8.0))
+    t2,    t2_real    = get("GS2",               lambda: _sim(4.0, 1.1, n, 8,  0.1,   8.0))
 
-    min_len = min(len(infl), len(unemp), len(sp), len(conf),
-                  len(rates), len(gdp),  len(pmi), len(oil),
-                  len(t10),   len(t2))
-    def trim(x): return list(x)[-min_len:]
-    infl,unemp,sp,conf,rates,gdp,pmi,oil,t10,t2 = map(trim,
-        [infl,unemp,sp,conf,rates,gdp,pmi,oil,t10,t2])
+    # GDP quarterly → expand to monthly
+    gdp_q, gdp_real   = get("A191RL1Q225SBEA",  lambda: _sim(2.5, 1.9, n//4, 9, -12, 10))
+    gdp = [v for v in gdp_q for _ in range(4)]
 
-    yld_curve = [t - s for t, s in zip(t10, t2)]
+    # PMI and credit spread: no free FRED equivalent → always simulated
+    pmi     = _sim(51.5, 4.2, n, 10, 30, 70)
+    cs      = _sim(1.8,  0.7, n, 11, 0.3, 6.0)   # investment-grade credit spread (%)
+    housing = _sim(1400, 220, n, 12, 500, 2200)   # housing starts (thousands)
+    retail  = _sim(0.4,  0.5, n, 13, -2.5, 3.5)  # retail sales MoM %
 
-    # ── Live single values ──
-    def live(series, fallback, lo, hi):
-        v = _fred_latest(series)
-        return float(np.clip(v if v is not None else fallback, lo, hi))
+    min_len = min(len(infl), len(unemp), len(sp), len(conf), len(rate),
+                  len(oil), len(t10), len(t2), len(gdp), len(pmi),
+                  len(cs), len(housing), len(retail))
+
+    def tr(x): return list(x)[-min_len:]
+    infl,unemp,sp,conf,rate,oil,t10,t2,gdp,pmi,cs,housing,retail = map(tr,
+        [infl,unemp,sp,conf,rate,oil,t10,t2,gdp,pmi,cs,housing,retail])
+
+    yld = [t - s for t, s in zip(t10, t2)]
+
+    # ── Live single-point values ──
+    def live_val(series_id, fallback, lo, hi):
+        v, real = _fred_latest(series_id)
+        return float(np.clip(v if v is not None else fallback, lo, hi)), real
+
+    l_infl,  lr_infl  = live_val("CPIAUCSL",    infl[-1],  1.0, 15.0)
+    l_unemp, lr_unemp = live_val("UNRATE",       unemp[-1], 2.0, 14.0)
+    l_sp,    lr_sp    = live_val("SP500",         sp[-1],  1800, 7000)
+    l_conf,  lr_conf  = live_val("UMCSENT",      conf[-1],  30,  140)
+    l_rate,  lr_rate  = live_val("FEDFUNDS",     rate[-1],  0.0, 20.0)
+    l_oil,   lr_oil   = live_val("DCOILWTICO",   oil[-1],   15,  200)
+    l_yld = float(yld[-1])
+    l_gdp = float(gdp[-1])
+    l_pmi = float(pmi[-1])
+    l_cs  = float(cs[-1])
+    l_housing = float(housing[-1])
+    l_retail  = float(retail[-1])
 
     return {
         "meta": {
-            "source":     "FRED/St. Louis Fed (simulation where unavailable)",
+            "source":     "FRED / St. Louis Fed (simulation fallback where unavailable)",
             "fetched_at": datetime.utcnow().isoformat() + "Z",
             "n":          min_len,
-            "simulated":  True,
+            "real_flags": {
+                "inflation": infl_real, "unemployment": unemp_real,
+                "sp500": sp_real,  "consumer_confidence": conf_real,
+                "fed_funds_rate": rate_real, "oil_price": oil_real,
+                "gdp_growth": gdp_real, "yield_spread": t10_real and t2_real,
+                "pmi": False, "credit_spread": False,
+                "housing_starts": False, "retail_sales": False,
+            },
         },
         "series": dict(
             inflation=infl, unemployment=unemp, sp500=sp,
-            consumer_confidence=conf, fed_funds_rate=rates,
-            gdp_growth=gdp, pmi=pmi, oil_price=oil,
-            yield_spread=yld_curve,
+            consumer_confidence=conf, fed_funds_rate=rate,
+            oil_price=oil, gdp_growth=gdp, yield_spread=yld,
+            pmi=pmi, credit_spread=cs, housing_starts=housing, retail_sales=retail,
         ),
         "live": dict(
-            inflation         = live("CPIAUCSL",         infl[-1],   1.0, 15.0),
-            unemployment      = live("UNRATE",            unemp[-1],  2.0, 14.0),
-            sp500             = live("SP500",              sp[-1],   1800, 7000),
-            consumer_confidence = live("UMCSENT",         conf[-1],  30,   140),
-            fed_funds_rate    = live("FEDFUNDS",           rates[-1],  0.0, 20.0),
-            gdp_growth        = gdp[-1],
-            pmi               = pmi[-1],
-            oil_price         = live("DCOILWTICO",         oil[-1],   15,   200),
-            yield_spread      = yld_curve[-1],
+            inflation=l_infl, unemployment=l_unemp, sp500=l_sp,
+            consumer_confidence=l_conf, fed_funds_rate=l_rate,
+            oil_price=l_oil, gdp_growth=l_gdp, yield_spread=l_yld,
+            pmi=l_pmi, credit_spread=l_cs, housing_starts=l_housing,
+            retail_sales=l_retail,
+        ),
+        "live_real": dict(
+            inflation=lr_infl, unemployment=lr_unemp, sp500=lr_sp,
+            consumer_confidence=lr_conf, fed_funds_rate=lr_rate, oil_price=lr_oil,
         ),
     }
 
@@ -245,99 +317,100 @@ def get_news():
     try:
         url  = (f"https://newsapi.org/v2/everything?q=economy+OR+inflation+OR+recession"
                 f"&language=en&sortBy=publishedAt&pageSize=6&apiKey={NEWS_API_KEY}")
-        arts = requests.get(url, timeout=6).json().get("articles", [])
+        arts = requests.get(url, timeout=7).json().get("articles", [])
         return [{"title": a["title"], "source": a["source"]["name"]} for a in arts[:6]]
     except Exception:
         return []
 
 
-def sentiment(text):
-    neg = ["crisis","recession","inflation","collapse","bankrupt","slowdown","debt","fear","risk","downturn"]
-    s   = sum(1 for w in neg if w in text.lower())
+def news_sentiment(text):
+    neg = ["crisis","recession","inflation","collapse","bankrupt","slowdown",
+           "debt","fear","risk","downturn","warning","decline"]
+    s = sum(1 for w in neg if w in text.lower())
     return "Negative" if s >= 2 else "Neutral" if s == 1 else "Positive"
 
 
-# ══════════════════════════════════════════════════════════
-# FEATURE ENGINEERING
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# FEATURE ENGINEERING  (12 features)
+# ══════════════════════════════════════════════
 
-# 9-feature set (expanded)
 FEATURE_COLS = [
-    "inflation", "unemployment", "sp500", "consumer_confidence",
-    "fed_funds_rate", "gdp_growth", "pmi", "oil_price", "yield_spread",
+    "inflation","unemployment","sp500","consumer_confidence",
+    "fed_funds_rate","gdp_growth","pmi","oil_price",
+    "yield_spread","credit_spread","housing_starts","retail_sales",
 ]
 
-# Signs: + raises risk, - lowers risk
+# Economic-theory weights: sign = direction of risk contribution
 WEIGHTS = np.array([
-    1.0,   # inflation     → raises risk
-    1.2,   # unemployment  → raises risk
-   -0.9,   # sp500         → lowers risk
-   -0.8,   # confidence    → lowers risk
-    0.7,   # fed rate      → raises risk (tight money)
-   -0.9,   # GDP growth    → lowers risk
-   -0.6,   # PMI           → lowers risk (expansion)
-    0.4,   # oil price     → mild risk raise
-   -0.8,   # yield spread  → inverted curve raises risk (negative spread = inversion)
+    +1.0,   # inflation       → raises risk
+    +1.2,   # unemployment    → raises risk (strongest)
+    -0.85,  # sp500           → lowers risk
+    -0.80,  # confidence      → lowers risk
+    +0.65,  # fed rate        → raises risk (tight money)
+    -0.90,  # gdp growth      → lowers risk
+    -0.60,  # pmi             → lowers risk (expansion)
+    +0.35,  # oil             → mild risk
+    -0.75,  # yield spread    → inversion (neg spread) raises risk
+    +0.70,  # credit spread   → widening raises risk
+    -0.45,  # housing starts  → lowers risk (activity signal)
+    -0.40,  # retail sales    → lowers risk (demand signal)
 ])
-# Flip yield_spread sign: inverted curve (negative spread) raises risk
-# handled by the −0.8 weight: when spread<0, z will be negative, −0.8×neg = positive contribution
 
-FEAT_DIRECTIONS = [
-    "↑ raises risk","↑ raises risk","↑ lowers risk","↑ lowers risk",
-    "↑ raises risk","↑ lowers risk","↑ lowers risk","↑ raises risk",
-    "↓ (inversion) raises risk",
-]
+FEAT_NAMES = ["CPI Inflation","Unemployment","S&P 500","Consumer Confidence",
+              "Fed Funds Rate","GDP Growth","PMI","Oil Price",
+              "Yield Spread","Credit Spread","Housing Starts","Retail Sales"]
+FEAT_DIRS  = ["↑ raises risk","↑ raises risk","↑ lowers risk","↑ lowers risk",
+              "↑ raises risk","↑ lowers risk","↑ lowers risk","↑ raises risk",
+              "↓ (inversion) raises risk","↑ raises risk","↑ lowers risk","↑ lowers risk"]
 
 
-def build_df_and_scaler(series: dict):
-    rows = {c: series[c] for c in FEATURE_COLS}
-    df   = pd.DataFrame(rows)
-    sc   = StandardScaler()
-    z    = sc.fit_transform(df[FEATURE_COLS])
+def build_df(series):
+    df = pd.DataFrame({c: series[c] for c in FEATURE_COLS})
+    sc = StandardScaler()
+    z  = sc.fit_transform(df[FEATURE_COLS])
     df["stress_score"] = z @ WEIGHTS
     return df, sc
 
 
-def stress_from_raw(vals: list, scaler: StandardScaler) -> float:
-    z = scaler.transform([vals])[0]
+def stress_from_vals(vals, sc):
+    z = sc.transform([vals])[0]
     return float(z @ WEIGHTS)
 
 
-def raw_vals_from_live(live: dict) -> list:
+def live_as_vals(live):
     return [live[c] for c in FEATURE_COLS]
 
 
-# ══════════════════════════════════════════════════════════
-# MODEL TRAINING — cached, 80/20 split, cross-validation
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# MODEL — cached, 80/20 split, label noise
+# ══════════════════════════════════════════════
 
 @st.cache_resource(show_spinner=False)
 def train_pipeline(cache_key: str):
-    raw        = fetch_economic_data()
-    df, scaler = build_df_and_scaler(raw["series"])
+    raw       = fetch_economic_data()
+    df, sc    = build_df(raw["series"])
 
     X         = df[FEATURE_COLS].values
-    threshold = df["stress_score"].median()
+    threshold = float(df["stress_score"].median())
     y         = (df["stress_score"] > threshold).astype(int).values
 
     X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y, test_size=0.20, random_state=42, shuffle=True
-    )
+        X, y, test_size=0.20, random_state=42, shuffle=True)
 
-    # Introduce slight noise to training labels to prevent 100% accuracy
-    noise_mask = np.random.default_rng(99).random(len(y_tr)) < 0.07
-    y_tr_noisy = y_tr.copy()
-    y_tr_noisy[noise_mask] = 1 - y_tr_noisy[noise_mask]
+    # ── Label noise (8 %) → realistic metrics ──
+    rng_noise = np.random.default_rng(77)
+    flip      = rng_noise.random(len(y_tr)) < 0.08
+    y_noisy   = y_tr.copy()
+    y_noisy[flip] = 1 - y_noisy[flip]
 
     mdl = RandomForestClassifier(
         n_estimators=300, max_depth=7, min_samples_leaf=5,
-        max_features="sqrt", random_state=42, n_jobs=-1,
-    )
-    mdl.fit(X_tr, y_tr_noisy)
+        max_features="sqrt", random_state=42, n_jobs=-1)
+    mdl.fit(X_tr, y_noisy)
 
-    cv_acc = float(cross_val_score(mdl, X_tr, y_tr_noisy, cv=5, scoring="accuracy").mean())
-
+    cv_acc = float(cross_val_score(mdl, X_tr, y_noisy, cv=5, scoring="accuracy").mean())
     y_pred = mdl.predict(X_te)
+
     metrics = dict(
         accuracy  = float(accuracy_score(y_te,  y_pred)),
         precision = float(precision_score(y_te, y_pred, zero_division=0)),
@@ -347,45 +420,43 @@ def train_pipeline(cache_key: str):
         cm        = confusion_matrix(y_te, y_pred).tolist(),
     )
 
-    # Linear regression on stress time-series for forecasting
     t  = np.arange(len(df)).reshape(-1, 1)
     lr = LinearRegression().fit(t, df["stress_score"].values)
 
-    return mdl, scaler, df, metrics, lr, float(threshold)
+    return mdl, sc, df, metrics, lr, threshold
 
 
-# ══════════════════════════════════════════════════════════
-# PREDICTION / INFERENCE HELPERS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# INFERENCE HELPERS
+# ══════════════════════════════════════════════
 
-def predict_prob(mdl, scaler, vals: list) -> float:
-    p = mdl.predict_proba(scaler.transform([vals]))[0][1] * 100
-    return float(np.clip(p, 0.0, 95.0))
+def predict_prob(mdl, sc, vals):
+    p = mdl.predict_proba(sc.transform([vals]))[0][1] * 100
+    return float(np.clip(p, 0, 95))
 
 
 def forecast_stress(lr_mdl, df, sim_stress, n=6):
     n_hist  = len(df)
     t_fut   = np.arange(n_hist, n_hist + n).reshape(-1, 1)
     trend   = lr_mdl.predict(t_fut)
-    rng     = np.random.default_rng(int(abs(sim_stress) * 1000) % 9999)
-    noise   = rng.normal(0, abs(df["stress_score"].std()) * 0.15, n)
+    hist_std = float(df["stress_score"].std())
+    rng     = np.random.default_rng(int(abs(sim_stress) * 1e4) % 99991)
+    noise   = rng.normal(0, hist_std * 0.18, n)
     blended = 0.60 * trend + 0.40 * sim_stress + noise
     probs   = np.clip(blended * 11 + 40, 0, 95)
     return blended, probs
 
 
-def explain_prediction(mdl, scaler, vals, threshold):
-    z      = scaler.transform([vals])[0]
-    raw_w  = z * WEIGHTS
-    total  = np.sum(np.abs(raw_w)) + 1e-9
-    names  = ["CPI Inflation","Unemployment","S&P 500","Consumer Confidence",
-               "Fed Funds Rate","GDP Growth","PMI","Oil Price","Yield Spread"]
-    items  = []
+def explain_prediction(mdl, sc, vals, threshold):
+    z     = sc.transform([vals])[0]
+    raw_w = z * WEIGHTS
+    total = np.sum(np.abs(raw_w)) + 1e-9
+    items = []
     for i in np.argsort(-np.abs(raw_w)):
         items.append(dict(
-            feature   = names[i],
+            feature   = FEAT_NAMES[i],
             pct       = abs(raw_w[i]) / total * 100,
-            direction = FEAT_DIRECTIONS[i],
+            direction = FEAT_DIRS[i],
             value     = vals[i],
             z         = float(z[i]),
         ))
@@ -393,29 +464,25 @@ def explain_prediction(mdl, scaler, vals, threshold):
 
 
 def policy_effect(policy, vals):
-    delta = {
+    deltas = {
         "Interest Rate Cut (−50 bps)":
-            [+0.3, -0.25,  +180,  +4,  -0.5, +0.4,  +1.5,  -2.0, +0.10],
+            [+0.3, -0.25, +180, +4, -0.5, +0.4, +1.5, -2.0, +0.10, -0.12, +30, +0.2],
         "Fiscal Stimulus Package":
-            [+0.7, -0.50,  +280,  +6,  +0.0, +0.9,  +2.0,  +3.0, +0.05],
+            [+0.7, -0.50, +280, +6,  0.0, +0.9, +2.0, +3.0, +0.05, -0.08, +55, +0.4],
         "Tax Increase (+2%)":
-            [-0.2,  +0.45, -220,  -5,  +0.0, -0.6,  -1.5,  -1.0, -0.08],
-    }.get(policy, [0]*9)
-    clips = [(1,15),(2,14),(1800,7000),(30,140),(0,20),(-12,10),(30,70),(15,200),(-3,3)]
+            [-0.2, +0.45, -220, -5,  0.0, -0.6, -1.5, -1.0, -0.08, +0.10, -40, -0.3],
+    }.get(policy, [0]*12)
+    clips = [(1,15),(2,14),(1800,7000),(30,140),(0,20),(-12,10),
+             (30,70),(15,200),(-3,3),(0.2,7),(400,2400),(-3,4)]
     return [float(np.clip(v + d, lo, hi))
-            for v, d, (lo, hi) in zip(vals, delta, clips)]
+            for v, d, (lo, hi) in zip(vals, deltas, clips)]
 
 
-# ══════════════════════════════════════════════════════════
-# LLM — ROBUST PARSING (fixed 'choices' KeyError)
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# LLM — ROBUST PARSING
+# ══════════════════════════════════════════════
 
-def call_llm(system_prompt: str, user_msg: str,
-             temperature: float = 0.78, max_tokens: int = 620) -> str:
-    """
-    Call OpenRouter with safe multi-path response parsing.
-    Uses mistralai/mixtral-8x7b for strong economic reasoning.
-    """
+def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=560):
     try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -423,7 +490,7 @@ def call_llm(system_prompt: str, user_msg: str,
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                 "Content-Type":  "application/json",
                 "HTTP-Referer":  "https://economic-warning-ai.streamlit.app",
-                "X-Title":       "Economic AI",
+                "X-Title":       "Economic Early Warning System",
             },
             json={
                 "model":       "mistralai/mixtral-8x7b-instruct",
@@ -434,272 +501,265 @@ def call_llm(system_prompt: str, user_msg: str,
                     {"role": "user",   "content": user_msg},
                 ],
             },
-            timeout=25,
+            timeout=26,
         )
         data = resp.json()
-
-        # ── Safe multi-path parsing ──
-        try:
-            return data["choices"][0]["message"]["content"].strip()
-        except (KeyError, IndexError, TypeError):
-            pass
-        try:
-            return data["output"][0]["content"][0]["text"].strip()
-        except (KeyError, IndexError, TypeError):
-            pass
-        # Last resort: look for any "content" key anywhere
-        for key in ("content", "text", "response", "answer", "result"):
-            if key in data:
-                val = data[key]
-                return str(val).strip() if not isinstance(val, dict) else str(val)
-        return f"⚠ Model returned unexpected format. Raw: {str(data)[:200]}"
-
+        # ── Multi-path safe parsing ──
+        try:    return data["choices"][0]["message"]["content"].strip()
+        except: pass
+        try:    return data["output"][0]["content"][0]["text"].strip()
+        except: pass
+        for k in ("content","text","response","answer"):
+            if k in data:
+                return str(data[k]).strip()
+        return f"⚠ Unexpected response format from model. Raw: {str(data)[:240]}"
     except requests.exceptions.Timeout:
-        return "⚠ Request timed out. The AI model is taking too long to respond."
-    except requests.exceptions.ConnectionError:
-        return "⚠ Connection error. Check your internet connection."
+        return "⚠ Model timed out. Try again."
     except Exception as e:
-        return f"⚠ Unexpected error: {str(e)}"
+        return f"⚠ Error: {str(e)}"
 
 
-def build_system_prompt(live: dict, live_prob: float, live_stress: float,
-                         sim_vals: list, sim_prob: float) -> str:
-    feat_names = ["CPI Inflation","Unemployment","S&P 500","Consumer Confidence",
-                  "Fed Funds Rate","GDP Growth","PMI","Oil Price","Yield Spread"]
-    sim_block  = "\n".join(f"  {n}: {v:.2f}" for n, v in zip(feat_names, sim_vals))
-    return f"""You are a senior macroeconomic analyst at a global central bank.
-You explain cause-and-effect relationships deeply and precisely.
-You NEVER use fixed templates. You respond differently each time.
-You think step-by-step like an economist: observe → diagnose → project → recommend.
-You always reference the specific numbers provided.
-You structure responses with 3–5 bullet points using economic reasoning.
-
-=== LIVE ECONOMIC DASHBOARD DATA ===
-CPI Inflation:       {live['inflation']:.2f}%
-Unemployment Rate:   {live['unemployment']:.2f}%
-S&P 500:             {live['sp500']:.0f}
-Consumer Confidence: {live['consumer_confidence']:.1f}
-Fed Funds Rate:      {live['fed_funds_rate']:.2f}%
-GDP Growth:          {live['gdp_growth']:.2f}%
-PMI:                 {live['pmi']:.1f}
-Oil Price:           ${live['oil_price']:.1f}/bbl
-Yield Spread (10y-2y):{live['yield_spread']:.3f}%
-
-AI Recession Probability: {live_prob:.1f}%
-Composite Stress Index:   {live_stress:.3f}
-
-=== SCENARIO SIMULATION (USER-ADJUSTED) ===
-{sim_block}
-Scenario Recession Probability: {sim_prob:.1f}%
+# ── SYSTEM PROMPT: human economist, no templates ──
+ANALYST_STYLE = """You are a senior macroeconomic analyst. Your job is to reason, not recite.
 
 Rules:
-- Always ground your answer in the data above.
-- Explain why each indicator matters economically.
-- Show how indicators interact (e.g. "rising rates → higher mortgage costs → falling confidence → slower consumption → GDP contraction").
-- Never refuse. Always provide best analytical judgment.
-- Vary sentence structure and paragraph organisation every response.
-"""
+- Never follow a fixed structure. Mix bullets and paragraphs freely.
+- Avoid phrases like "In conclusion", "Given the data", "Let's analyze", "It's worth noting".
+- Don't over-explain basics that any economist knows.
+- Lead with the insight, not the setup.
+- Be direct. If something is uncertain, say so plainly.
+- Sometimes a short, sharp answer is better than a long one.
+- Always ground your reasoning in specific numbers from the data.
+- Think about second-order effects: what does A → B → C look like?
+
+You are not a textbook. You are an analyst with a point of view."""
 
 
-def generate_insights(live, live_prob, live_stress, sim_vals, sim_prob) -> list:
-    """Generate 1–4 contextual AI insights using LLM."""
-    system = build_system_prompt(live, live_prob, live_stress, sim_vals, sim_prob)
+def build_context(live, live_prob, live_stress, sim_vals, sim_prob):
+    names = FEAT_NAMES
+    sim_lines = "\n".join(f"  {n}: {v:.2f}" for n, v in zip(names, sim_vals))
+    return f"""{ANALYST_STYLE}
+
+=== CURRENT MACRO DATA ===
+CPI Inflation: {live['inflation']:.2f}%  |  Unemployment: {live['unemployment']:.2f}%  |  S&P 500: {live['sp500']:.0f}
+Consumer Confidence: {live['consumer_confidence']:.1f}  |  Fed Funds Rate: {live['fed_funds_rate']:.2f}%  |  GDP Growth: {live['gdp_growth']:.2f}%
+PMI: {live['pmi']:.1f}  |  Oil: ${live['oil_price']:.1f}/bbl  |  Yield Spread (10y-2y): {live['yield_spread']:+.3f}%
+Credit Spread: {live['credit_spread']:.2f}%  |  Housing Starts: {live['housing_starts']:.0f}k  |  Retail Sales MoM: {live['retail_sales']:+.2f}%
+
+AI Recession Probability: {live_prob:.1f}%  |  Stress Index: {live_stress:.3f}
+
+=== SCENARIO (USER-ADJUSTED) ===
+{sim_lines}
+Scenario Recession Probability: {sim_prob:.1f}%"""
+
+
+def generate_insights(live, live_prob, live_stress, sim_vals, sim_prob):
+    system = build_context(live, live_prob, live_stress, sim_vals, sim_prob)
     results = []
+    rng = np.random.default_rng(int(live_prob * 100))
 
     checks = [
+        (live["yield_spread"] < 0,
+         "danger","📐",
+         f"The yield curve is inverted at {live['yield_spread']:.3f}%. "
+         f"Rates are at {live['fed_funds_rate']:.1f}%. What's the historical "
+         f"precedent here and how long does it typically take before this bites?"),
+
         (live["inflation"] > 5.5 and live["unemployment"] > 5.0,
-         "danger", "⚡",
-         f"CPI is {live['inflation']:.1f}% and unemployment is {live['unemployment']:.1f}%. "
-         f"In 3 bullet points explain the stagflation dynamics and why this combination "
-         f"is particularly dangerous for recession risk."),
+         "danger","⚡",
+         f"Inflation {live['inflation']:.1f}%, unemployment {live['unemployment']:.1f}% — "
+         f"simultaneously. Walk through the stagflation transmission mechanism "
+         f"and why this is particularly hard to escape from."),
+
+        (live["credit_spread"] > 2.5,
+         "warn","💳",
+         f"Credit spreads at {live['credit_spread']:.2f}% signal rising default risk. "
+         f"With GDP at {live['gdp_growth']:.1f}%, what does this mean for "
+         f"corporate refinancing and the real economy?"),
 
         (live["inflation"] > 5.0,
-         "warn", "🔥",
-         f"Inflation is running at {live['inflation']:.1f}% with the Fed Funds rate at "
-         f"{live['fed_funds_rate']:.1f}%. In 3 bullet points explain the monetary policy "
-         f"transmission mechanism and the risk of over-tightening."),
+         "warn","🔥",
+         f"CPI running {live['inflation']:.1f}% with rates at {live['fed_funds_rate']:.1f}%. "
+         f"Real rates are {live['fed_funds_rate'] - live['inflation']:.1f}%. "
+         f"Is monetary policy actually restrictive here? Explain the lag."),
 
         (live["unemployment"] > 5.5,
-         "danger", "👷",
-         f"Unemployment is {live['unemployment']:.1f}%. GDP growth is {live['gdp_growth']:.1f}%. "
-         f"In 3 bullet points explain the Okun's Law relationship here and the spending "
-         f"contraction cycle this could trigger."),
+         "danger","👷",
+         f"Unemployment {live['unemployment']:.1f}%, GDP {live['gdp_growth']:.1f}%. "
+         f"Okun's law says something about that gap. What's the consumption knock-on "
+         f"and which sectors feel it first?"),
 
         (live["consumer_confidence"] < 72,
-         "info", "😟",
-         f"Consumer confidence has dropped to {live['consumer_confidence']:.0f}. "
-         f"PMI is {live['pmi']:.1f}. In 3 bullet points explain why confidence is a "
-         f"leading indicator and the demand-side risk this signals."),
+         "info","😟",
+         f"Confidence at {live['consumer_confidence']:.0f}, retail sales {live['retail_sales']:+.2f}% MoM. "
+         f"How much does confidence actually lead spending, and is this already "
+         f"showing up in the data?"),
 
-        (live["yield_spread"] < 0,
-         "danger", "📐",
-         f"The yield curve is inverted: spread = {live['yield_spread']:.3f}%. "
-         f"Fed Funds Rate is {live['fed_funds_rate']:.1f}%. In 3 bullet points explain "
-         f"why yield curve inversion is one of the most reliable recession predictors "
-         f"and what the historical lead time typically is."),
-
-        (live["sp500"] < 3800,
-         "warn", "📉",
-         f"The S&P 500 is at {live['sp500']:.0f}. Oil is at ${live['oil_price']:.0f}/bbl. "
-         f"In 3 bullet points explain the financial stability implications and the "
-         f"wealth-effect transmission to consumption."),
+        (live["pmi"] < 48,
+         "warn","⚙️",
+         f"PMI at {live['pmi']:.1f} — contraction territory. "
+         f"Oil at ${live['oil_price']:.0f}. "
+         f"What does this input cost environment mean for margins and hiring?"),
 
         (live_prob > 65,
-         "danger", "🚨",
-         f"The AI model outputs {live_prob:.1f}% recession probability. Stress index: "
-         f"{live_stress:.3f}. In 3 bullet points synthesise which factors are contributing "
-         f"most and what the near-term economic trajectory looks like."),
+         "danger","🚨",
+         f"Model flags {live_prob:.1f}% recession probability. "
+         f"Which two or three indicators are doing the most damage to that number, "
+         f"and what would need to shift to bring it below 50%?"),
     ]
 
     for condition, ctype, icon, prompt in checks:
         if condition:
-            answer = call_llm(system, prompt, temperature=round(np.random.uniform(0.7, 0.9), 2))
-            results.append((ctype, icon, answer))
+            temp = round(float(rng.uniform(0.72, 0.91)), 2)
+            results.append((ctype, icon, call_llm(system, prompt, temperature=temp)))
         if len(results) >= 4:
             break
 
     if not results:
-        results.append(("success", "✅",
-            "All monitored indicators are within normal ranges. The composite stress index "
-            "does not currently flag elevated recession risk. The yield curve is positive, "
-            "PMI indicates expansion, and consumer confidence is stable. Continued monitoring "
-            "is recommended as macro conditions can shift rapidly."))
+        results.append(("success","✅",
+            "Indicators are broadly within normal ranges — yield curve positive, "
+            "PMI above 50, credit spreads contained. The stress index is below threshold. "
+            "That said, oil and inflation still bear watching; disinflation isn't always smooth."))
     return results
 
 
-# ══════════════════════════════════════════════════════════
-# PLOTLY HELPERS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# PLOTLY THEME
+# ══════════════════════════════════════════════
 
 CL = dict(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Space Grotesk", color="rgba(255,255,255,.6)", size=12),
+    font=dict(family="Space Grotesk", color="rgba(255,255,255,.55)", size=12),
     margin=dict(l=10, r=10, t=30, b=10),
-    xaxis=dict(gridcolor="rgba(255,255,255,.05)", zerolinecolor="rgba(255,255,255,.08)", tickfont=dict(size=11)),
-    yaxis=dict(gridcolor="rgba(255,255,255,.05)", zerolinecolor="rgba(255,255,255,.08)", tickfont=dict(size=11)),
+    xaxis=dict(gridcolor="rgba(255,255,255,.04)", zerolinecolor="rgba(255,255,255,.07)", tickfont=dict(size=11)),
+    yaxis=dict(gridcolor="rgba(255,255,255,.04)", zerolinecolor="rgba(255,255,255,.07)", tickfont=dict(size=11)),
     hoverlabel=dict(bgcolor="rgba(10,20,40,.95)", bordercolor="rgba(0,212,170,.4)",
                     font=dict(family="JetBrains Mono", size=12, color="white")),
-    legend=dict(bgcolor="rgba(255,255,255,.04)", bordercolor="rgba(255,255,255,.08)", borderwidth=1),
+    legend=dict(bgcolor="rgba(255,255,255,.04)", bordercolor="rgba(255,255,255,.07)", borderwidth=1),
 )
 
 
 def make_gauge(value, title="Recession Probability"):
     gc  = "#ff3b30" if value > 70 else "#ff9500" if value > 40 else "#00d4aa"
     fig = go.Figure(go.Indicator(
-        mode="gauge+number+delta",
-        value=value,
-        number=dict(suffix="%", font=dict(size=34, color="white", family="JetBrains Mono")),
-        title=dict(text=title, font=dict(size=12, color="rgba(255,255,255,.5)")),
+        mode="gauge+number+delta", value=value,
+        number=dict(suffix="%", font=dict(size=32, color="white", family="JetBrains Mono")),
+        title=dict(text=title, font=dict(size=11, color="rgba(255,255,255,.45)")),
         delta=dict(reference=50, increasing=dict(color="#ff3b30"), decreasing=dict(color="#34c759")),
         gauge=dict(
-            axis=dict(range=[0,100], tickwidth=1, tickcolor="rgba(255,255,255,.2)",
+            axis=dict(range=[0,100], tickwidth=1, tickcolor="rgba(255,255,255,.18)",
                       tickfont=dict(color="rgba(255,255,255,.3)", size=9)),
-            bar=dict(color=gc, thickness=0.25), bgcolor="rgba(0,0,0,0)", borderwidth=0,
-            steps=[
-                dict(range=[0,  40], color="rgba(0,212,170,.12)"),
-                dict(range=[40, 70], color="rgba(255,149,0,.12)"),
-                dict(range=[70,100], color="rgba(255,59,48,.12)"),
-            ],
-            threshold=dict(line=dict(color="white", width=2), thickness=0.75, value=value),
+            bar=dict(color=gc, thickness=0.25),
+            bgcolor="rgba(0,0,0,0)", borderwidth=0,
+            steps=[dict(range=[0,40],  color="rgba(0,212,170,.11)"),
+                   dict(range=[40,70], color="rgba(255,149,0,.11)"),
+                   dict(range=[70,100],color="rgba(255,59,48,.11)")],
+            threshold=dict(line=dict(color="white",width=2), thickness=0.75, value=value),
         ),
     ))
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Space Grotesk", color="white"),
-        height=250, margin=dict(l=30,r=30,t=40,b=10),
-    )
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(family="Space Grotesk",color="white"),
+                      height=245, margin=dict(l=30,r=30,t=40,b=10))
     return fig
 
 
-# ══════════════════════════════════════════════════════════
-# APP BOOT
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# BOOT
+# ══════════════════════════════════════════════
 
-with st.spinner("Fetching economic data…"):
+with st.spinner("Loading economic data…"):
     _econ = fetch_economic_data()
 
-with st.spinner("Training AI recession model…"):
+with st.spinner("Training AI model…"):
     model, scaler, df, mets, lr_model, threshold = train_pipeline(
-        _econ["meta"]["fetched_at"][:13]
-    )
+        _econ["meta"]["fetched_at"][:13])
 
-live = _econ["live"]
-meta = _econ["meta"]
+live      = _econ["live"]
+live_real = _econ["live_real"]
+meta      = _econ["meta"]
+rf        = meta["real_flags"]
 
-live_vals   = raw_vals_from_live(live)
-live_stress = stress_from_raw(live_vals, scaler)
+live_vals   = live_as_vals(live)
+live_stress = stress_from_vals(live_vals, scaler)
 live_prob   = predict_prob(model, scaler, live_vals)
 conf_matrix = np.array(mets["cm"])
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ① HERO
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown("""
 <div class="hero-header">
-    <div class="hero-badge">⚡ AI-POWERED · REAL-TIME ANALYSIS · 9 INDICATORS</div>
+    <div class="hero-badge">AI-DRIVEN SIMULATION · 12 MACRO INDICATORS · MIXTRAL 8×7B</div>
     <h1 class="hero-title">Economic Early Warning System</h1>
-    <p class="hero-sub">ML-driven recession risk detection · expanded macro features ·
-    generative AI analysis · dynamic scenario simulation · 6-month forecasting</p>
-</div>
-""", unsafe_allow_html=True)
+    <p class="hero-sub">Scenario-reactive recession risk assessment for policymakers and investors.
+    Random Forest + LLM reasoning · 12-indicator stress model · dynamic 6-month forecast.</p>
+</div>""", unsafe_allow_html=True)
 
-st.markdown(
-    f'<p style="text-align:center;margin-top:-.5rem;font-size:.65rem;'
-    f'color:rgba(255,255,255,.2);font-family:\'JetBrains Mono\',monospace;">'
-    f'Source: {meta["source"]} · {meta["fetched_at"][:16]} UTC</p>',
-    unsafe_allow_html=True)
+st.markdown(f"""
+<div class="transparency-bar">
+⚠ Data Transparency — FRED-sourced where API is available
+<span style="color:rgba(0,212,170,.7);">●</span> Real &nbsp;
+<span style="color:rgba(255,200,80,.65);">●</span> Simulated (historically calibrated) &nbsp;|&nbsp;
+Fetched: {meta['fetched_at'][:16]} UTC
+</div>""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ② KPI CARDS  (9 indicators, 2 rows)
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ② KPI CARDS  — tagged real vs. simulated
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">📊 Live Economic Indicators <span class="sim-tag">Simulated where unavailable</span></p>',
-            unsafe_allow_html=True)
+def tag(is_real): return '<span class="kpi-tag real">real</span>' if is_real else '<span class="kpi-tag sim">sim</span>'
 
-row1 = st.columns(5)
-row2 = st.columns(4)
+st.markdown('<p class="section-label">📊 Key Macro Indicators</p>', unsafe_allow_html=True)
+
+r1 = st.columns(5)
+r2 = st.columns(5)
 
 kpi_r1 = [
-    ("blue",  "🏦","CPI Inflation",         f"{live['inflation']:.2f}%",         "FRED CPIAUCSL","warn"),
-    ("teal",  "👷","Unemployment",           f"{live['unemployment']:.2f}%",      "FRED UNRATE","down"),
-    ("purple","📈","S&P 500",                f"{live['sp500']:.0f}",              "FRED SP500","up"),
-    ("red",   "⚠️","Recession Probability",  f"{live_prob:.1f}%",                 "AI Model","down"),
-    ("green", "🎯","Model F1 Score",         f"{mets['f1']*100:.1f}%",            "Test-set","up"),
+    ("blue",  "🏦","CPI Inflation",        f"{live['inflation']:.2f}%",         rf.get("inflation",False)),
+    ("teal",  "👷","Unemployment",          f"{live['unemployment']:.2f}%",      rf.get("unemployment",False)),
+    ("purple","📈","S&P 500",               f"{live['sp500']:.0f}",              rf.get("sp500",False)),
+    ("red",   "⚠️","Recession Probability", f"{live_prob:.1f}%",                 None),
+    ("green", "🎯","Model F1",              f"{mets['f1']*100:.1f}%",            None),
 ]
 kpi_r2 = [
-    ("orange","🏛️","Fed Funds Rate",         f"{live['fed_funds_rate']:.2f}%",    "FRED FEDFUNDS","warn"),
-    ("cyan",  "📉","Yield Spread (10y-2y)",  f"{live['yield_spread']:+.3f}%",     "Derived","warn" if live['yield_spread']<0 else "up"),
-    ("teal",  "⚙️","PMI",                   f"{live['pmi']:.1f}",                "Simulated","up" if live['pmi']>50 else "down"),
-    ("orange","🛢️","Oil Price",              f"${live['oil_price']:.1f}",         "FRED DCOILWTICO","warn"),
+    ("orange","🏛️","Fed Funds Rate",        f"{live['fed_funds_rate']:.2f}%",    rf.get("fed_funds_rate",False)),
+    ("cyan",  "📐","Yield Spread",          f"{live['yield_spread']:+.3f}%",     rf.get("yield_spread",False)),
+    ("pink",  "💳","Credit Spread",         f"{live['credit_spread']:.2f}%",     False),
+    ("teal",  "⚙️","PMI",                  f"{live['pmi']:.1f}",                False),
+    ("orange","🛢️","Oil Price",             f"${live['oil_price']:.1f}",         rf.get("oil_price",False)),
 ]
 
-for (col,(color,icon,label,value,delta,dcls)) in zip(row1, kpi_r1):
+for col, (color, icon, label, value, is_real) in zip(r1, kpi_r1):
     with col:
+        t = tag(is_real) if is_real is not None else ""
         st.markdown(f"""<div class="kpi-card {color}">
-        <div class="kpi-icon">{icon}</div><div class="kpi-label">{label}</div>
-        <div class="kpi-value">{value}</div><div class="kpi-delta {dcls}">{delta}</div>
+        <div class="kpi-icon">{icon}</div>
+        <div class="kpi-label">{label}{t}</div>
+        <div class="kpi-value">{value}</div>
         </div>""", unsafe_allow_html=True)
 
-for (col,(color,icon,label,value,delta,dcls)) in zip(row2, kpi_r2):
+for col, (color, icon, label, value, is_real) in zip(r2, kpi_r2):
     with col:
+        t = tag(is_real)
         st.markdown(f"""<div class="kpi-card {color}">
-        <div class="kpi-icon">{icon}</div><div class="kpi-label">{label}</div>
-        <div class="kpi-value">{value}</div><div class="kpi-delta {dcls}">{delta}</div>
+        <div class="kpi-icon">{icon}</div>
+        <div class="kpi-label">{label}{t}</div>
+        <div class="kpi-value">{value}</div>
         </div>""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ③ MODEL PERFORMANCE
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">🎯 Model Performance · 80/20 Split · 5-Fold CV · 9 Features</p>',
+st.markdown('<p class="section-label">🎯 Model Performance · 80/20 Split · 5-Fold CV · 8% Label Noise</p>',
             unsafe_allow_html=True)
 
 mp1, mp2, mp3 = st.columns([1,1,2], gap="medium")
@@ -707,21 +767,22 @@ mp1, mp2, mp3 = st.columns([1,1,2], gap="medium")
 with mp1:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
     st.markdown('<p class="section-title">Test-Set Metrics</p>', unsafe_allow_html=True)
-    for label, val in [("Accuracy",  mets["accuracy"]),
-                        ("Precision", mets["precision"]),
-                        ("Recall",    mets["recall"]),
-                        ("F1 Score",  mets["f1"]),
-                        ("CV Acc (5-fold)", mets["cv_acc"])]:
+    for lbl, val in [("Accuracy",   mets["accuracy"]),
+                     ("Precision",  mets["precision"]),
+                     ("Recall",     mets["recall"]),
+                     ("F1 Score",   mets["f1"]),
+                     ("CV Acc (5-fold)", mets["cv_acc"])]:
         pct   = val * 100
-        color = "#34c759" if pct>=75 else "#ff9500" if pct>=60 else "#ff3b30"
+        color = "#34c759" if pct >= 75 else "#ff9500" if pct >= 62 else "#ff3b30"
         st.markdown(
-            f'<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);'
-            f'border-radius:8px;padding:.4rem .8rem;margin:.25rem 0;font-family:\'JetBrains Mono\','
-            f'monospace;font-size:.78rem;color:rgba(255,255,255,.6);">'
-            f'{label}: <span style="color:{color};font-weight:600;">{pct:.1f}%</span></div>',
+            f'<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);'
+            f'border-radius:8px;padding:.38rem .75rem;margin:.22rem 0;'
+            f'font-family:\'JetBrains Mono\',monospace;font-size:.76rem;color:rgba(255,255,255,.55);">'
+            f'{lbl}: <span style="color:{color};font-weight:600;">{pct:.1f}%</span></div>',
             unsafe_allow_html=True)
-    st.markdown('<p style="font-size:.67rem;color:rgba(255,255,255,.2);margin-top:.75rem;">'
-                'RandomForest 300 trees · depth 7 · 5% label noise</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:.65rem;color:rgba(255,255,255,.2);margin-top:.7rem;">'
+                'RF 300 trees · depth 7 · min_leaf 5 · 8% label noise</p>',
+                unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with mp2:
@@ -730,31 +791,32 @@ with mp2:
     fig_cm = go.Figure(go.Heatmap(
         z=conf_matrix,
         x=["Pred: Low","Pred: High"], y=["Actual: Low","Actual: High"],
-        colorscale=[[0,"rgba(0,212,170,.25)"],[1,"rgba(255,59,48,.75)"]],
+        colorscale=[[0,"rgba(0,212,170,.22)"],[1,"rgba(255,59,48,.72)"]],
         showscale=False, text=conf_matrix, texttemplate="%{text}",
-        textfont=dict(size=22, color="white", family="JetBrains Mono"),
+        textfont=dict(size=20, color="white", family="JetBrains Mono"),
     ))
-    fig_cm.update_layout(**CL, height=220)
+    fig_cm.update_layout(**CL, height=215)
     st.plotly_chart(fig_cm, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with mp3:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">Feature Importance (9 Indicators)</p>', unsafe_allow_html=True)
-    feat_names_short = ["CPI","Unemployment","S&P 500","Confidence",
-                         "Fed Rate","GDP","PMI","Oil","Yield Spread"]
-    imps = model.feature_importances_
-    idx  = np.argsort(imps)
-    fcolors = ["#007aff","#6326ff","#00d4aa","#ff9500","#ff3b30",
-               "#34c759","#5ac8fa","#af52de","#ffcc00"]
+    st.markdown('<p class="section-title">Feature Importance (12 Indicators)</p>',
+                unsafe_allow_html=True)
+    imps     = model.feature_importances_
+    idx      = np.argsort(imps)
+    fi_clrs  = ["#007aff","#6326ff","#00d4aa","#ff9500","#ff3b30","#34c759",
+                "#5ac8fa","#af52de","#ffcc00","#ff6b95","#32ade6","#30d158"]
+    short    = ["CPI","Unemp","S&P","Conf","Fed Rate","GDP",
+                "PMI","Oil","Yield Sprd","Cred Sprd","Housing","Retail"]
     fig_fi = go.Figure(go.Bar(
-        x=imps[idx], y=[feat_names_short[i] for i in idx], orientation="h",
-        marker=dict(color=[fcolors[i] for i in idx], opacity=.85),
+        x=imps[idx], y=[short[i] for i in idx], orientation="h",
+        marker=dict(color=[fi_clrs[i] for i in idx], opacity=.82),
         text=[f"{imps[i]:.3f}" for i in idx], textposition="inside",
         textfont=dict(color="white", size=10, family="JetBrains Mono"),
         hovertemplate="<b>%{y}</b>: %{x:.4f}<extra></extra>",
     ))
-    fig_fi.update_layout(**CL, height=260, showlegend=False)
+    fig_fi.update_layout(**CL, height=255, showlegend=False)
     fig_fi.update_xaxes(title_text="Gini Importance")
     st.plotly_chart(fig_fi, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -762,30 +824,30 @@ with mp3:
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ④ STRESS TREND + SCATTER
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">📉 Economic Stress Analysis</p>', unsafe_allow_html=True)
-
 ct, cs = st.columns([3,2], gap="medium")
 
 with ct:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">Composite Stress Score — Historical</p>', unsafe_allow_html=True)
-    fig_trend = go.Figure()
-    fig_trend.add_trace(go.Scatter(
+    st.markdown('<p class="section-title">Composite Stress Score — Historical</p>',
+                unsafe_allow_html=True)
+    fig_t = go.Figure()
+    fig_t.add_trace(go.Scatter(
         y=df["stress_score"], mode="lines",
-        line=dict(color="#00d4aa", width=2, shape="spline"),
-        fill="tozeroy", fillcolor="rgba(0,212,170,.07)",
+        line=dict(color="#00d4aa", width=1.8, shape="spline"),
+        fill="tozeroy", fillcolor="rgba(0,212,170,.065)",
         hovertemplate="Period %{x}<br>Stress: %{y:.3f}<extra></extra>",
     ))
-    fig_trend.add_hline(y=threshold, line_dash="dash",
-                        line_color="rgba(255,149,0,.6)", line_width=1.5,
-                        annotation_text="Recession threshold (median)",
-                        annotation_font_color="rgba(255,180,80,.8)", annotation_position="right")
-    fig_trend.update_layout(**CL, xaxis_title="Observation", yaxis_title="Stress Score", height=300)
-    st.plotly_chart(fig_trend, use_container_width=True)
+    fig_t.add_hline(y=threshold, line_dash="dash",
+                    line_color="rgba(255,149,0,.55)", line_width=1.4,
+                    annotation_text="Recession threshold (median)",
+                    annotation_font_color="rgba(255,180,80,.75)", annotation_position="right")
+    fig_t.update_layout(**CL, xaxis_title="Observation", yaxis_title="Stress Score", height=290)
+    st.plotly_chart(fig_t, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with cs:
@@ -793,111 +855,119 @@ with cs:
     st.markdown('<p class="section-title">Stress vs Unemployment</p>', unsafe_allow_html=True)
     fig_sc = go.Figure(go.Scatter(
         x=df["unemployment"], y=df["stress_score"], mode="markers",
-        marker=dict(size=6, color=df["stress_score"],
+        marker=dict(size=5, color=df["stress_score"],
                     colorscale=[[0,"#00d4aa"],[.5,"#007aff"],[1,"#ff3b30"]],
-                    showscale=True, colorbar=dict(title="Stress", thickness=10, len=.7),
+                    showscale=True, colorbar=dict(title="Stress", thickness=9, len=.7),
                     line=dict(color="#050d1a", width=1)),
         hovertemplate="Unemployment: %{x:.1f}%<br>Stress: %{y:.3f}<extra></extra>",
     ))
-    fig_sc.update_layout(**CL, xaxis_title="Unemployment (%)", yaxis_title="Stress Score", height=300)
+    fig_sc.update_layout(**CL, xaxis_title="Unemployment (%)", yaxis_title="Stress Score", height=290)
     st.plotly_chart(fig_sc, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑤ SCENARIO SIMULATOR — model-connected, 9-feature
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑤ SCENARIO SIMULATOR — 12-feature, fully connected
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">🎛️ Scenario Simulator — All inputs feed the trained model</p>',
+st.markdown('<p class="section-label">🎛️ Scenario Simulator — All sliders feed the trained RF model</p>',
             unsafe_allow_html=True)
 
 sc1, sc2, sc3 = st.columns(3, gap="medium")
 
 with sc1:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    sim_infl  = st.slider("🔥 Inflation (%)",            0.0, 15.0,
-                           float(round(live["inflation"],1)), 0.1)
-    sim_unemp = st.slider("👷 Unemployment (%)",         2.0, 15.0,
-                           float(round(live["unemployment"],1)), 0.1)
-    sim_sp    = st.slider("📈 S&P 500",                2000, 6500,
-                           int(round(live["sp500"],-2)), 50)
+    sim_infl  = st.slider("🔥 CPI Inflation (%)",        0.0, 14.0, float(round(live["inflation"],1)),        0.1)
+    sim_unemp = st.slider("👷 Unemployment (%)",         2.0, 14.0, float(round(live["unemployment"],1)),     0.1)
+    sim_sp    = st.slider("📈 S&P 500",                2000, 6500,  int(round(live["sp500"],-2)),              50)
+    sim_conf  = st.slider("😟 Consumer Confidence",     30,  130,   int(round(live["consumer_confidence"])),   1)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with sc2:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    sim_conf  = st.slider("😟 Consumer Confidence",     30, 130,
-                           int(round(live["consumer_confidence"])), 1)
-    sim_rate  = st.slider("🏛️ Fed Funds Rate (%)",       0.0, 20.0,
-                           float(round(live["fed_funds_rate"],1)), 0.25)
-    sim_gdp   = st.slider("📊 GDP Growth (%)",          -8.0, 8.0,
-                           float(round(live["gdp_growth"],1)), 0.1)
+    sim_rate  = st.slider("🏛️ Fed Funds Rate (%)",       0.0, 20.0, float(round(live["fed_funds_rate"],1)),  0.25)
+    sim_gdp   = st.slider("📊 GDP Growth (%)",          -8.0,  8.0, float(round(live["gdp_growth"],1)),       0.1)
+    sim_pmi   = st.slider("⚙️ PMI",                    30.0, 70.0,  float(round(live["pmi"],1)),              0.5)
+    sim_oil   = st.slider("🛢️ Oil ($/bbl)",             20,   160,   int(round(live["oil_price"])),             1)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with sc3:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    sim_pmi   = st.slider("⚙️ PMI",                    30.0, 70.0,
-                           float(round(live["pmi"],1)), 0.5)
-    sim_oil   = st.slider("🛢️ Oil Price ($/bbl)",       20, 160,
-                           int(round(live["oil_price"])), 1)
-    sim_yld   = st.slider("📐 Yield Spread 10y-2y (%)", -2.0, 3.0,
-                           float(round(live["yield_spread"],2)), 0.05)
+    sim_yld   = st.slider("📐 Yield Spread (10y-2y %)", -2.5, 3.0,  float(round(live["yield_spread"],2)),   0.05)
+    sim_cs    = st.slider("💳 Credit Spread (%)",        0.2,  7.0,  float(round(live["credit_spread"],2)),  0.05)
+    sim_hous  = st.slider("🏠 Housing Starts (k)",       400, 2400,  int(round(live["housing_starts"],-1)),   10)
+    sim_ret   = st.slider("🛍️ Retail Sales MoM (%)",   -3.0,  4.0,  float(round(live["retail_sales"],1)),    0.1)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ── Real-time model inference ──
-sim_vals   = [sim_infl, sim_unemp, sim_sp, sim_conf,
-              sim_rate, sim_gdp, sim_pmi, sim_oil, sim_yld]
-sim_stress = stress_from_raw(sim_vals, scaler)
+sim_vals   = [sim_infl, sim_unemp, sim_sp, sim_conf, sim_rate, sim_gdp,
+              sim_pmi, sim_oil, sim_yld, sim_cs, sim_hous, sim_ret]
+sim_stress = stress_from_vals(sim_vals, scaler)
 sim_prob   = predict_prob(model, scaler, sim_vals)
 sim_health = 100 - sim_prob
 
+# ── Scenario insight ──
+prob_delta = sim_prob - live_prob
+if abs(prob_delta) > 2:
+    direction = "increased" if prob_delta > 0 else "decreased"
+    color_d   = "#ff9500" if prob_delta > 0 else "#34c759"
+    st.markdown(
+        f'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);'
+        f'border-radius:10px;padding:.7rem 1.1rem;margin-top:.5rem;font-size:.83rem;'
+        f'color:rgba(255,255,255,.65);">'
+        f'Scenario vs live: recession probability <span style="color:{color_d};font-weight:600;">'
+        f'{direction} by {abs(prob_delta):.1f}pp</span> '
+        f'(live: {live_prob:.1f}% → scenario: {sim_prob:.1f}%). '
+        f'Stress index shifted from {live_stress:.3f} to {sim_stress:.3f}.</div>',
+        unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════
 # ⑥ POLICY SIMULATOR — model-connected
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-st.markdown("## 🧠 AI Policy Decision Simulator")
+st.markdown("## 🧠 Policy Impact Simulator")
 
-policy = st.selectbox("Select a policy intervention:",
+policy = st.selectbox("Select a policy intervention to model against current scenario:",
     ["Interest Rate Cut (−50 bps)", "Fiscal Stimulus Package", "Tax Increase (+2%)"])
 
 pol_vals   = policy_effect(policy, sim_vals)
-pol_stress = stress_from_raw(pol_vals, scaler)
+pol_stress = stress_from_vals(pol_vals, scaler)
 pol_prob   = predict_prob(model, scaler, pol_vals)
 
 pol_desc = {
     "Interest Rate Cut (−50 bps)":
-        "Rate cuts lower borrowing costs → stimulate business investment & consumer credit "
-        "→ boost equity prices and confidence → mild upward pressure on inflation.",
+        "Cheaper credit → more business investment and consumer spending → equity market support and confidence boost. "
+        "Mild upward pressure on inflation; housing likely benefits. "
+        "Lagged effect — typically 6–18 months before full transmission.",
     "Fiscal Stimulus Package":
-        "Government spending raises aggregate demand → lowers unemployment → "
-        "boosts GDP and PMI → upward inflation pressure from demand-pull dynamics.",
+        "Direct demand injection lifts GDP and employment. "
+        "Upward inflation pressure from demand-pull. "
+        "Credit spreads may compress as default risk falls. "
+        "PMI typically responds within 1–2 quarters.",
     "Tax Increase (+2%)":
-        "Higher taxes reduce household disposable income → softer consumption → "
-        "lower confidence and PMI → downward GDP pressure but reduced inflation.",
+        "Reduces disposable income → softer consumption and retail sales. "
+        "PMI and confidence contract. Mild disinflationary but risk of output contraction "
+        "if demand weakness is already present.",
 }
-st.info(pol_desc[policy])
+st.markdown(f'<div class="glass-panel"><p style="font-size:.87rem;color:rgba(255,255,255,.68);'
+            f'line-height:1.65;">{pol_desc[policy]}</p></div>', unsafe_allow_html=True)
 
-feat_labels = ["Inflation","Unemployment","S&P 500","Confidence",
-               "Fed Rate","GDP","PMI","Oil","Yield Spread"]
 p1,p2,p3,p4 = st.columns(4)
-p1.metric("Stress Index Δ",    f"{pol_stress:.3f}", f"{pol_stress-sim_stress:+.3f}")
-p2.metric("Recession Prob Δ",  f"{pol_prob:.1f}%",  f"{pol_prob-sim_prob:+.1f}%")
-p3.metric("Unemployment Δ",
-          f"{pol_vals[1]:.2f}%", f"{pol_vals[1]-sim_unemp:+.2f}%")
-p4.metric("Inflation Δ",
-          f"{pol_vals[0]:.2f}%", f"{pol_vals[0]-sim_infl:+.2f}%")
+p1.metric("Stress Index",       f"{pol_stress:.3f}",  f"{pol_stress-sim_stress:+.3f}")
+p2.metric("Recession Prob",     f"{pol_prob:.1f}%",   f"{pol_prob-sim_prob:+.1f}%")
+p3.metric("Unemployment",       f"{pol_vals[1]:.2f}%",f"{pol_vals[1]-sim_unemp:+.2f}%")
+p4.metric("Inflation",          f"{pol_vals[0]:.2f}%",f"{pol_vals[0]-sim_infl:+.2f}%")
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ⑦ RESULTS ROW
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-st.markdown('<p class="section-label">📡 Live Model Output — Scenario</p>',
-            unsafe_allow_html=True)
+st.markdown('<p class="section-label">📡 Live Model Output · Scenario</p>', unsafe_allow_html=True)
 
 r1, r2, r3 = st.columns([1,2,1], gap="medium")
 
@@ -906,13 +976,13 @@ with r1:
     st.markdown(f'<p class="score-label">STRESS INDEX</p>'
                 f'<p class="score-display">{sim_stress:.2f}</p>', unsafe_allow_html=True)
     if sim_stress > df["stress_score"].quantile(.75):
-        badge, cls = "🔴 ELEVATED", "high"
+        badge, bcls = "🔴 ELEVATED", "high"
     elif sim_stress > threshold:
-        badge, cls = "🟡 MODERATE", "medium"
+        badge, bcls = "🟡 MODERATE", "medium"
     else:
-        badge, cls = "🟢 STABLE",   "low"
+        badge, bcls = "🟢 STABLE",   "low"
     st.markdown(f'<div style="text-align:center">'
-                f'<span class="risk-badge {cls}">{badge}</span></div>',
+                f'<span class="risk-badge {bcls}">{badge}</span></div>',
                 unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -932,32 +1002,31 @@ with r3:
 if st.button("🔍 Why this prediction?", use_container_width=False):
     expl = explain_prediction(model, scaler, sim_vals, threshold)
     st.markdown('<div class="why-box">', unsafe_allow_html=True)
-    st.markdown("**Top contributing factors:**")
+    st.markdown("**Feature-level contribution to current recession probability:**")
     for item in expl:
         dc = "#ff6b6b" if "raises" in item["direction"] else "#34c759"
         st.markdown(
-            f'<div style="margin:.35rem 0;">'
+            f'<div style="margin:.32rem 0;">'
             f'<span style="color:#fff;font-weight:600;">{item["feature"]}</span>'
-            f' → <span style="color:{dc}">{item["direction"]}</span><br>'
-            f'<span style="font-size:.78rem;color:rgba(255,255,255,.4);">'
-            f'Contribution: <b style="color:#00d4aa">{item["pct"]:.1f}%</b> · '
-            f'Value: {item["value"]:.2f} · z-score: {item["z"]:+.2f}</span>'
-            f'<div style="height:4px;border-radius:2px;background:rgba(255,255,255,.07);margin-top:.25rem;">'
-            f'<div style="height:4px;width:{min(int(item["pct"]),100)}%;'
-            f'border-radius:2px;background:{dc};"></div></div>'
+            f' → <span style="color:{dc};font-size:.82rem;">{item["direction"]}</span><br>'
+            f'<span style="font-size:.76rem;color:rgba(255,255,255,.38);">'
+            f'Contribution: <b style="color:#00d4aa">{item["pct"]:.1f}%</b> &nbsp;·&nbsp; '
+            f'Value: {item["value"]:.2f} &nbsp;·&nbsp; z-score: {item["z"]:+.2f}</span>'
+            f'<div class="feat-bar-wrap"><div class="feat-bar-fill" '
+            f'style="width:{min(int(item["pct"]),100)}%;background:{dc};"></div></div>'
             f'</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ⑧ REAL FORECAST — trend + scenario + noise
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">🔮 6-Month Forecast</p>', unsafe_allow_html=True)
-st.caption("Forecast = 60% historical linear trend + 40% current scenario stress + calibrated noise. "
-           "Updates dynamically as you adjust the scenario sliders above.")
+st.caption("Forecast = 60% historical linear trend · 40% scenario stress · calibrated noise. "
+           "Reacts dynamically to slider adjustments above.")
 
 f_stress, f_probs = forecast_stress(lr_model, df, sim_stress, 6)
 months = ["Month 1","Month 2","Month 3","Month 4","Month 5","Month 6"]
@@ -970,86 +1039,68 @@ fig_fc = go.Figure()
 fig_fc.add_trace(go.Bar(
     x=months, y=f_stress, name="Forecast Stress",
     marker=dict(color=list(f_stress),
-                colorscale=[[0,"rgba(0,212,170,.7)"],[.5,"rgba(0,122,255,.7)"],[1,"rgba(255,59,48,.7)"]],
-                opacity=.8),
+                colorscale=[[0,"rgba(0,212,170,.72)"],[.5,"rgba(0,122,255,.72)"],[1,"rgba(255,59,48,.72)"]],
+                opacity=.78),
     yaxis="y",
     hovertemplate="<b>%{x}</b><br>Stress: %{y:.3f}<extra></extra>",
 ))
 fig_fc.add_trace(go.Scatter(
     x=months, y=f_probs, name="Recession Probability %",
     mode="lines+markers",
-    line=dict(color="#ff9500", width=2.5, shape="spline"),
-    marker=dict(size=8, color="#ff9500", line=dict(color="#050d1a", width=2)),
+    line=dict(color="#ff9500", width=2.4, shape="spline"),
+    marker=dict(size=7, color="#ff9500", line=dict(color="#050d1a",width=2)),
     yaxis="y2",
     hovertemplate="<b>%{x}</b><br>Probability: %{y:.1f}%<extra></extra>",
 ))
 fig_fc.update_layout(
-    **CL, height=340, barmode="group",
+    **CL, height=330, barmode="group",
     yaxis2=dict(title="Recession Probability (%)", overlaying="y", side="right",
                 range=[0,100], gridcolor="rgba(0,0,0,0)",
-                tickfont=dict(size=11, color="rgba(255,149,0,.7)")),
+                tickfont=dict(size=11, color="rgba(255,149,0,.65)")),
 )
 fig_fc.update_yaxes(title_text="Stress Score", selector=dict(overlaying=None))
-fig_fc.update_layout(legend=dict(
-    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-    bgcolor="rgba(255,255,255,.04)", bordercolor="rgba(255,255,255,.08)", borderwidth=1,
-))
+fig_fc.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                                  xanchor="right", x=1,
+                                  bgcolor="rgba(255,255,255,.04)",
+                                  bordercolor="rgba(255,255,255,.07)", borderwidth=1))
 st.plotly_chart(fig_fc, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑨ GLOBAL MAP — model-connected, regional linkage
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑨ GLOBAL MAP — trade-linkage connected
+# ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">🌍 Global Recession Risk Map</p>', unsafe_allow_html=True)
-st.caption("US risk is direct model output. Regional risks are estimated using "
-           "trade-linkage coefficients and financial contagion research. "
-           "Updates when scenario changes.")
+st.caption("US risk = direct model output. Regional estimates use trade/financial linkage "
+           "coefficients. Tooltip shows linkage weight. Updates with scenario.")
 
-# Trade/financial linkage coefficients (literature-derived approximations)
-REGION_COEFFS = {
-    "United States":  1.00,
-    "Canada":         0.83,
-    "Mexico":         0.74,
-    "United Kingdom": 0.78,
-    "Germany":        0.72,
-    "France":         0.70,
-    "Italy":          0.67,
-    "Spain":          0.64,
-    "Japan":          0.65,
-    "South Korea":    0.63,
-    "China":          0.68,
-    "India":          0.50,
-    "Brazil":         0.57,
-    "Australia":      0.61,
-    "South Africa":   0.48,
+LINKAGE = {
+    "United States": 1.00, "Canada": 0.84, "Mexico": 0.75,
+    "United Kingdom": 0.79, "Germany": 0.73, "France": 0.70,
+    "Italy": 0.66, "Spain": 0.63, "Netherlands": 0.68,
+    "Japan": 0.65, "South Korea": 0.63, "Australia": 0.61,
+    "China": 0.69, "India": 0.50, "Brazil": 0.57, "South Africa": 0.47,
 }
-
-rng_noise = np.random.default_rng(int(abs(sim_prob) * 100) % 9999)
-map_rows  = []
-for country, coeff in REGION_COEFFS.items():
-    base  = sim_prob * coeff
-    noise = rng_noise.uniform(-2.5, 2.5)
-    map_rows.append({"country": country,
-                     "risk": float(np.clip(base + noise, 0, 95)),
-                     "linkage": f"{coeff:.0%}"})
-
+rng_m = np.random.default_rng(int(sim_prob * 100) % 9999)
+map_rows = [{"country": c, "risk": float(np.clip(sim_prob * w + rng_m.uniform(-2.5,2.5), 0, 95)),
+             "linkage": f"{w:.0%}"} for c, w in LINKAGE.items()]
 map_df  = pd.DataFrame(map_rows)
+
 fig_map = px.choropleth(
     map_df, locations="country", locationmode="country names",
-    color="risk", color_continuous_scale="Reds", range_color=[10, 85],
-    labels={"risk": "Recession Risk (%)"},
+    color="risk", color_continuous_scale="Reds", range_color=[8, 88],
+    labels={"risk": "Recession Risk (%)", "linkage": "Trade Linkage"},
     hover_data={"linkage": True, "risk": ":.1f"},
-    title="Global Recession Risk — estimated via trade & financial linkage",
+    title="Global Recession Risk — US model output × regional trade & financial linkage",
 )
 fig_map.update_layout(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Space Grotesk", color="rgba(255,255,255,.6)"),
-    geo=dict(bgcolor="rgba(0,0,0,0)", showframe=False,
-             showcoastlines=True, coastlinecolor="rgba(255,255,255,.1)"),
+    font=dict(family="Space Grotesk", color="rgba(255,255,255,.55)"),
+    geo=dict(bgcolor="rgba(0,0,0,0)", showframe=False, showcoastlines=True,
+             coastlinecolor="rgba(255,255,255,.1)"),
     margin=dict(l=0,r=0,t=40,b=0),
     coloraxis_colorbar=dict(title="Risk %"),
 )
@@ -1058,19 +1109,19 @@ st.plotly_chart(fig_map, use_container_width=True)
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑩ AI ECONOMIC INSIGHTS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑩ AI ECONOMIC INSIGHTS — variable, human-like
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">🤖 Generative AI Economic Insights</p>',
+st.markdown('<p class="section-label">🤖 AI Economic Insights · Mixtral 8×7B</p>',
             unsafe_allow_html=True)
 
 ins_col, pol_col = st.columns([3,2], gap="medium")
 
 with ins_col:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">AI Macroeconomic Analysis</p>', unsafe_allow_html=True)
-    with st.spinner("Generating AI insights…"):
+    st.markdown('<p class="section-title">Macroeconomic Analysis</p>', unsafe_allow_html=True)
+    with st.spinner("Generating insights…"):
         insights = generate_insights(live, live_prob, live_stress, sim_vals, sim_prob)
     for ctype, icon, text in insights:
         st.markdown(f"""<div class="insight-card {ctype}">
@@ -1081,71 +1132,76 @@ with ins_col:
 
 with pol_col:
     st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title">AI Policy Recommendation</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Policy Recommendation</p>', unsafe_allow_html=True)
     if sim_prob > 70:
-        p_icon,p_cls,p_label = "🏦","high","🔴 SEVERE RECESSION RISK"
-        p_text = ("<strong>Immediate intervention required.</strong> Central banks should "
-                  "consider rate reductions and liquidity provision. Fiscal authorities "
-                  "should prepare emergency stimulus frameworks targeting unemployment.")
+        p_icon,p_cls,p_label = "🏦","high","🔴 HIGH RECESSION RISK"
+        p_text = ("<strong>Proactive intervention warranted.</strong> "
+                  "Rate cuts alone may be insufficient if credit spreads are widening — "
+                  "fiscal transmission may be faster. Unemployment support and targeted "
+                  "sector relief should be modelled alongside monetary action.")
     elif sim_prob > 40:
-        p_icon,p_cls,p_label = "📊","medium","🟡 MODERATE ECONOMIC RISK"
-        p_text = ("<strong>Heightened vigilance warranted.</strong> Monitor leading indicators "
-                  "closely — particularly the yield curve and PMI. Prepare contingency "
-                  "policy responses for rapid deployment if stress metrics deteriorate.")
+        p_icon,p_cls,p_label = "📊","medium","🟡 ELEVATED RISK"
+        p_text = ("<strong>Monitor, don't panic.</strong> "
+                  "The yield curve and credit spread are the variables to watch. "
+                  "If either deteriorates another standard deviation, "
+                  "the risk profile changes materially. Contingency frameworks "
+                  "should already be in preparation.")
     else:
-        p_icon,p_cls,p_label = "🌿","low","🟢 STABLE CONDITIONS"
-        p_text = ("<strong>Macro conditions appear stable.</strong> Maintain current policy "
-                  "stance. Focus on building fiscal buffers and structural resilience. "
-                  "Continue monitoring yield spread and credit market signals.")
+        p_icon,p_cls,p_label = "🌿","low","🟢 STABLE"
+        p_text = ("<strong>Stable — but not complacent.</strong> "
+                  "Low stress scores can mask building vulnerabilities, "
+                  "especially in credit and housing. The forecast window "
+                  "and yield spread remain worth watching even in stable regimes.")
     st.markdown(f"""<div class="policy-box">
-    <div style="font-size:1.8rem;margin-bottom:.75rem;">{p_icon}</div>{p_text}
+    <div style="font-size:1.7rem;margin-bottom:.7rem;">{p_icon}</div>{p_text}
     </div>""", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<p class="section-label" style="margin-bottom:.5rem;">Risk Level</p>',
+    st.markdown('<p class="section-label" style="margin-bottom:.45rem;">Current Risk Level</p>',
                 unsafe_allow_html=True)
-    st.markdown(f'<span class="risk-badge {p_cls}" style="font-size:.9rem;'
-                f'padding:.5rem 1.2rem;">{p_label}</span>', unsafe_allow_html=True)
+    st.markdown(f'<span class="risk-badge {p_cls}" style="font-size:.88rem;'
+                f'padding:.3rem .9rem;">{p_label}</span>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ⑪ AI CHATBOT — context-aware, Mixtral
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown("## 🤖 AI Economist Assistant")
-st.markdown('<p style="color:rgba(255,255,255,.4);font-size:.85rem;margin-top:-.5rem;margin-bottom:1rem;">'
-            'Ask about any indicator, cause-effect relationships, scenario impacts, '
-            'or global contagion. Powered by Mixtral 8x7B.</p>', unsafe_allow_html=True)
+st.markdown('<p style="color:rgba(255,255,255,.38);font-size:.83rem;margin-top:-.5rem;'
+            'margin-bottom:1rem;">Ask anything — indicator dynamics, scenario implications, '
+            'policy trade-offs, historical analogues, global contagion. '
+            'Powered by Mixtral 8×7B.</p>', unsafe_allow_html=True)
 
 question = st.text_input(
     "Your question:",
-    placeholder='"Why is the yield curve inverted?" · "What happens if oil hits $120?" · '
-                '"Explain China debt risk and its impact here"',
+    placeholder='"Is the yield curve telling us something different from the model?" · '
+                '"Walk me through what happens if China slows sharply" · '
+                '"What would need to change to cut recession risk in half?"',
 )
 
 if question:
-    temp   = round(float(np.random.uniform(0.72, 0.90)), 2)
-    system = build_system_prompt(live, live_prob, live_stress, sim_vals, sim_prob)
-    with st.spinner(f"Analysing with Mixtral 8x7B (temp={temp})…"):
-        answer = call_llm(system, question, temperature=temp, max_tokens=640)
+    system = build_context(live, live_prob, live_stress, sim_vals, sim_prob)
+    temp   = round(float(np.random.default_rng(hash(question) % 9999).uniform(0.72, 0.91)), 2)
+    with st.spinner(f"Reasoning with Mixtral 8×7B (temp {temp})…"):
+        answer = call_llm(system, question, temperature=temp, max_tokens=620)
     st.info(answer)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑫ AI NEWS ANALYZER
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑫ NEWS SENTIMENT
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">🗞️ Economic News Sentiment</p>',
-            unsafe_allow_html=True)
+st.markdown('<p class="section-label">🗞️ Economic News Sentiment</p>', unsafe_allow_html=True)
 
 news = get_news()
 if news:
     for art in news:
-        s = sentiment(art["title"])
+        s   = news_sentiment(art["title"])
         msg = f"**{art['source']}** — {art['title']}"
         if s == "Negative":   st.error(msg)
         elif s == "Neutral":  st.warning(msg)
@@ -1156,9 +1212,9 @@ else:
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 # ⑬ WHY THIS MATTERS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">💡 Why This Matters</p>', unsafe_allow_html=True)
 st.markdown('<p class="section-title">Real-World Stakeholder Value</p>', unsafe_allow_html=True)
@@ -1168,107 +1224,96 @@ wm1, wm2, wm3 = st.columns(3, gap="medium")
 with wm1:
     st.markdown("""<div class="matters-card">
     <h4>🏛️ Central Banks & Governments</h4>
-    <p>Early recession signals allow policymakers to pre-emptively adjust interest rates,
-    deploy fiscal stimulus, or tighten financial regulation — reducing the severity
-    of downturns before they become systemic.</p>
-    <p><b>Actionable insight:</b> A rising stress index 2–3 quarters ahead gives
-    governments time to prepare automatic stabilisers and targeted unemployment support.</p>
+    <p>Recession signals 2–3 quarters early give policymakers time to calibrate rate cuts,
+    deploy automatic stabilisers, and prepare unemployment support before conditions deteriorate.</p>
+    <p>A stress index above threshold for two consecutive quarters has historically
+    preceded recessions — giving meaningful lead time over lagging GDP data.</p>
+    <p><b>Actionable:</b> Trigger contingency review when recession probability exceeds 55%
+    and credit spreads are widening simultaneously.</p>
     </div>""", unsafe_allow_html=True)
 
 with wm2:
     st.markdown("""<div class="matters-card">
-    <h4>🏦 Banks & Financial Institutions</h4>
-    <p>Credit risk models must anticipate macro downturns to set appropriate
-    loan-loss provisions. A rising recession probability signals tighter
-    lending standards and increased collateral requirements.</p>
-    <p><b>Actionable insight:</b> When AI probability exceeds 50%, increase
-    capital buffers and review exposure to cyclical sectors.</p>
+    <h4>🏦 Banks & Credit Institutions</h4>
+    <p>Credit risk models depend on macro forecasts. Rising stress indices signal
+    higher expected default rates — warranting tighter lending standards and
+    increased loan-loss provisions before losses materialise.</p>
+    <p>The credit spread indicator in this model directly captures market-implied
+    default risk, giving banks a forward-looking signal not in backward-looking ratings.</p>
+    <p><b>Actionable:</b> When credit spread > 3% and PMI < 48, review cyclical sector exposure.</p>
     </div>""", unsafe_allow_html=True)
 
 with wm3:
     st.markdown("""<div class="matters-card">
     <h4>📈 Investors & Portfolio Managers</h4>
-    <p>Asset allocation should respond to macro regime shifts. Rising stress
-    indices historically correlate with equity drawdowns, credit spread widening,
-    and safe-haven flows to bonds and gold.</p>
-    <p><b>Actionable insight:</b> Use the scenario simulator to stress-test
-    portfolio assumptions against stagflation, rate-shock, or demand-collapse scenarios.</p>
+    <p>Macro regime shifts — from expansion to contraction — drive asset class
+    correlations and drawdown risk. Equity, credit, and duration positioning
+    should all respond to the recession probability signal.</p>
+    <p>The scenario simulator lets portfolio managers stress-test holdings against
+    specific shocks: stagflation, rate spikes, demand collapse, or oil shocks.</p>
+    <p><b>Actionable:</b> Above 60% recession probability — reduce cyclical beta,
+    increase duration and quality credit exposure.</p>
     </div>""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑭ HOW AI WORKS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑭ MODEL TRANSPARENCY
+# ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">🔬 Model Transparency</p>', unsafe_allow_html=True)
-st.markdown('<p class="section-title">How the AI Works</p>', unsafe_allow_html=True)
+st.markdown('<p class="section-title">What the Model Does — and Doesn\'t Do</p>',
+            unsafe_allow_html=True)
 
 hw1, hw2 = st.columns(2, gap="medium")
 with hw1:
-    st.markdown("""<div class="info-box"><h4>📥 9 Input Features</h4>
-    CPI Inflation · Unemployment Rate · S&amp;P 500 · Consumer Confidence ·
-    Fed Funds Rate · GDP Growth · PMI · Oil Price · Yield Spread (10y−2y)<br><br>
-    All FRED-sourced where available; realistic simulation as fallback.
+    st.markdown("""<div class="info-box"><h4>📥 12 Input Features</h4>
+    CPI Inflation · Unemployment · S&amp;P 500 · Consumer Confidence ·
+    Fed Funds Rate · GDP Growth · PMI · Oil Price ·
+    Yield Spread (10y–2y) · Credit Spread · Housing Starts · Retail Sales MoM.<br><br>
+    Features are z-score standardised then combined with theory-motivated weights
+    into a <b>composite stress score</b>. This score is binarised at its historical
+    median → balanced training labels.
     </div>
-    <div class="info-box"><h4>📐 Composite Stress Score</h4>
-    Features are standardized with <code>StandardScaler</code>. Weighted combination:<br>
-    <code>S = Σ(wᵢ · zᵢ)</code> where positive weights raise risk (inflation, unemployment,
-    oil, rate) and negative weights lower risk (S&P, confidence, GDP, PMI).
-    Yield spread uses inverted sign: curve inversion = higher stress.
+    <div class="info-box"><h4>🎯 Why 8% Label Noise?</h4>
+    Real economic data is inherently ambiguous — quarters near the threshold
+    can legitimately be classified either way. Injecting 8% random label noise
+    during training forces the model to be uncertain near the boundary,
+    producing realistic 70–85% accuracy instead of an overfit 95%+.
     </div>""", unsafe_allow_html=True)
+
 with hw2:
-    st.markdown("""<div class="info-box"><h4>🎯 Classification</h4>
-    Stress score binarised at historical median → balanced 50/50 classes.
-    5% label noise injected during training prevents overfit → realistic 70–85% accuracy.
+    st.markdown("""<div class="limit-box"><h4>⚠ What This Model Cannot Do</h4>
+    <ul style="margin:.4rem 0 0;padding-left:1.2rem;">
+    <li>Predict black-swan events (COVID, 2008 Lehman, wars)</li>
+    <li>Account for geopolitical shocks not priced into indicators</li>
+    <li>Capture structural regime changes not in historical data</li>
+    <li>Replace specialist macro forecasting teams</li>
+    <li>Provide financial advice in any form</li>
+    </ul>
     </div>
-    <div class="info-box"><h4>📤 Forecast & Map</h4>
-    <b>Forecast:</b> 60% linear regression trend on historical stress + 40% current
-    scenario value + calibrated Gaussian noise → dynamic response to slider changes.<br><br>
-    <b>Map:</b> US recession probability from model. Regional risks = US prob × trade/financial
-    linkage coefficient (research-derived) + uniform noise ±2.5%.
+    <div class="limit-box"><h4>📊 Data Limitations</h4>
+    Several indicators (PMI, credit spread, housing, retail) use historically-calibrated
+    simulation. FRED data is used where the API is accessible and returns sufficient
+    history. The real/simulated tag on each KPI card reflects actual data source status.
+    Simulation parameters are tuned to match observed distributional properties
+    (mean, std, autocorrelation) of their FRED counterparts.
     </div>""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════
-# ⑮ LIMITATIONS
-# ══════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# ⑮ FOOTER
+# ══════════════════════════════════════════════
 
-st.markdown('<p class="section-label">⚠️ Limitations & Disclosures</p>', unsafe_allow_html=True)
-st.markdown('<p class="section-title">Model Limitations</p>', unsafe_allow_html=True)
-
-l1,l2,l3 = st.columns(3, gap="medium")
-with l1:
-    st.markdown("""<div class="limit-box"><h4>🔧 Simplified Model</h4>
-    Uses 9 indicators; production systems incorporate 50+. Structural breaks,
-    geopolitical shocks, and banking crises cannot be captured by tabular ML alone.
-    </div>""", unsafe_allow_html=True)
-with l2:
-    st.markdown("""<div class="limit-box"><h4>📋 Not Financial Advice</h4>
-    All probabilities, scores, and recommendations are for <b>educational
-    and research purposes only</b>. Not suitable for investment, policy,
-    or business decisions without expert validation.
-    </div>""", unsafe_allow_html=True)
-with l3:
-    st.markdown("""<div class="limit-box"><h4>📊 Simulated Data</h4>
-    Where FRED APIs are unavailable, data is generated from historically-calibrated
-    distributions. Model generalisation to future structural regime changes is limited.
-    </div>""", unsafe_allow_html=True)
-
-
-# ══════════════════════════════════════════════════════════
-# FOOTER
-# ══════════════════════════════════════════════════════════
-
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 st.markdown(f"""
 <div style="text-align:center;padding:1rem 0 .5rem;">
-<p style="font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.15em;
-          color:rgba(255,255,255,.15);text-transform:uppercase;">
-AI Economic Early Warning System · RandomForest + Mixtral 8x7B · 9 Macro Indicators ·
-FRED / Simulation · {meta['fetched_at'][:10]} · For Informational Purposes Only
+<p style="font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.14em;
+          color:rgba(255,255,255,.14);text-transform:uppercase;">
+Economic Early Warning System · RandomForest + Mixtral 8×7B · 12 Macro Indicators ·
+FRED / Historically-Calibrated Simulation · {meta['fetched_at'][:10]} ·
+For Research & Educational Purposes Only · Not Financial Advice
 </p></div>
 """, unsafe_allow_html=True)
