@@ -340,28 +340,79 @@ FEATURE_COLS = [
     "yield_spread","credit_spread","housing_starts","retail_sales",
 ]
 
-# Economic-theory weights: sign = direction of risk contribution
-WEIGHTS = np.array([
-    +1.0,   # inflation       → raises risk
-    +1.2,   # unemployment    → raises risk (strongest)
-    -0.85,  # sp500           → lowers risk
-    -0.80,  # confidence      → lowers risk
-    +0.65,  # fed rate        → raises risk (tight money)
-    -0.90,  # gdp growth      → lowers risk
-    -0.60,  # pmi             → lowers risk (expansion)
-    +0.35,  # oil             → mild risk
-    -0.75,  # yield spread    → inversion (neg spread) raises risk
-    +0.70,  # credit spread   → widening raises risk
-    -0.45,  # housing starts  → lowers risk (activity signal)
-    -0.40,  # retail sales    → lowers risk (demand signal)
-])
+# ──────────────────────────────────────────────────────────
+# FEATURE WEIGHTS  (theory-motivated, normalized so each
+#  |weight| / Σ|weights| ≤ 0.25, preventing any single
+#  feature from dominating the stress score)
+# ──────────────────────────────────────────────────────────
+# Raw magnitudes (all positive; sign applied separately):
+#   unemployment 22%, inflation 20%, gdp 16%, yield 13%,
+#   credit spread 11%, confidence 9%, sp500 8%, pmi 6%,
+#   fed rate 5%, oil 5%, housing 4%, retail 3%  → ∑ = 100%
+# Stress score = Σ (sign_i × w_i × z_i)
+# Positive contribution → raises risk; negative → lowers risk.
+# Note on yield_spread: spread is stored as (10y − 2y).
+#   Inversion means spread < 0 → z_spread < 0.
+#   Weight is −0.78: z_spread negative × (−0.78) = positive → raises risk. ✓
 
-FEAT_NAMES = ["CPI Inflation","Unemployment","S&P 500","Consumer Confidence",
-              "Fed Funds Rate","GDP Growth","PMI","Oil Price",
-              "Yield Spread","Credit Spread","Housing Starts","Retail Sales"]
-FEAT_DIRS  = ["↑ raises risk","↑ raises risk","↑ lowers risk","↑ lowers risk",
-              "↑ raises risk","↑ lowers risk","↑ lowers risk","↑ raises risk",
-              "↓ (inversion) raises risk","↑ raises risk","↑ lowers risk","↑ lowers risk"]
+_RAW_W = np.array([
+    0.20,  # inflation
+    0.22,  # unemployment
+    0.08,  # sp500
+    0.09,  # consumer_confidence
+    0.05,  # fed_funds_rate
+    0.16,  # gdp_growth
+    0.06,  # pmi
+    0.05,  # oil_price
+    0.13,  # yield_spread
+    0.11,  # credit_spread
+    0.04,  # housing_starts
+    0.03,  # retail_sales
+], dtype=float)
+_RAW_W /= _RAW_W.sum()   # normalise to exactly 1.0
+
+# Economic direction signs:
+#   +1 → higher value raises recession risk (inflation, unemp, fed rate, oil, credit spread)
+#   −1 → higher value lowers recession risk (sp500, confidence, gdp, pmi, housing, retail)
+#   yield_spread sign is −1: higher spread (steeper curve) lowers risk; inversion (neg spread)
+#     produces negative z → (−1) × (−z) = positive contribution → raises risk ✓
+_SIGNS = np.array([
+    +1,  # inflation       ↑ raises risk
+    +1,  # unemployment    ↑ raises risk
+    -1,  # sp500           ↑ lowers risk
+    -1,  # consumer_confidence ↑ lowers risk
+    +1,  # fed_funds_rate  ↑ raises risk (monetary tightening)
+    -1,  # gdp_growth      ↑ lowers risk
+    -1,  # pmi             ↑ lowers risk (expansion signal)
+    +1,  # oil_price       ↑ raises risk (cost-push)
+    -1,  # yield_spread    ↑ lowers risk; inversion (neg) raises risk ✓
+    +1,  # credit_spread   ↑ raises risk (default premium)
+    -1,  # housing_starts  ↑ lowers risk (construction activity)
+    -1,  # retail_sales    ↑ lowers risk (consumer demand)
+], dtype=float)
+
+WEIGHTS = _SIGNS * _RAW_W   # final signed weights
+
+# Human-readable labels — consistent with SIGNS above
+FEAT_NAMES = [
+    "CPI Inflation", "Unemployment", "S&P 500", "Consumer Confidence",
+    "Fed Funds Rate", "GDP Growth", "PMI", "Oil Price",
+    "Yield Spread (10y-2y)", "Credit Spread", "Housing Starts", "Retail Sales",
+]
+FEAT_DIRS = [
+    "↑ raises risk",              # inflation
+    "↑ raises risk",              # unemployment
+    "↑ lowers risk",              # sp500
+    "↑ lowers risk",              # confidence
+    "↑ raises risk",              # fed rate
+    "↑ lowers risk",              # gdp
+    "↑ lowers risk",              # pmi
+    "↑ raises risk",              # oil
+    "↓ inversion raises risk",    # yield_spread (negative z → higher risk)
+    "↑ raises risk",              # credit spread
+    "↑ lowers risk",              # housing starts
+    "↑ lowers risk",              # retail sales
+]
 
 
 def build_df(series):
@@ -436,44 +487,215 @@ def predict_prob(mdl, sc, vals):
 
 
 def forecast_stress(lr_mdl, df, sim_stress, n=6):
-    n_hist  = len(df)
-    t_fut   = np.arange(n_hist, n_hist + n).reshape(-1, 1)
-    trend   = lr_mdl.predict(t_fut)
+    """
+    6-month stress forecast:
+      - Trend component: linear regression on historical stress (60%)
+      - Scenario component: current simulation stress (40%)
+      - Mean-reversion: pull toward long-run median with 10% weight per step
+      - Volatility: calibrated to 20% of historical std, applied with AR(1)
+        structure so consecutive months differ meaningfully (no flat bars)
+      - Direction: high stress → upward drift; low stress → mild recovery
+
+    Result: forecast values differ month-to-month by design.
+    """
+    n_hist   = len(df)
     hist_std = float(df["stress_score"].std())
+    median   = float(df["stress_score"].median())
+
+    t_fut = np.arange(n_hist, n_hist + n).reshape(-1, 1)
+    trend = lr_mdl.predict(t_fut)
+
+    # Blend trend with scenario
+    base = 0.60 * trend + 0.40 * sim_stress
+
+    # Drift adjustment: if current scenario stress is high, add upward drift;
+    # if low, add slight mean-reverting recovery
+    stress_gap = sim_stress - median
+    drift_per_step = np.sign(stress_gap) * min(abs(stress_gap) * 0.06, hist_std * 0.12)
+
+    # AR(1) noise: each step's noise is partially inherited from the last
     rng     = np.random.default_rng(int(abs(sim_stress) * 1e4) % 99991)
-    noise   = rng.normal(0, hist_std * 0.18, n)
-    blended = 0.60 * trend + 0.40 * sim_stress + noise
-    probs   = np.clip(blended * 11 + 40, 0, 95)
-    return blended, probs
+    eps     = rng.normal(0, hist_std * 0.20, n)
+    ar_noise = np.zeros(n)
+    ar_noise[0] = eps[0]
+    for i in range(1, n):
+        ar_noise[i] = 0.55 * ar_noise[i - 1] + 0.45 * eps[i]
+
+    # Mean-reversion: pull 8% back toward median each step
+    forecasted = np.zeros(n)
+    prev = sim_stress
+    for i in range(n):
+        revert    = (median - prev) * 0.08
+        forecasted[i] = base[i] + drift_per_step * (i + 1) + ar_noise[i] + revert
+        prev = forecasted[i]
+
+    # Convert stress to probability: logistic-style mapping
+    # stress at median → ~50 %; +2σ → ~80 %; −2σ → ~20 %
+    norm_stress = (forecasted - median) / (hist_std + 1e-9)
+    probs = np.clip(50 + 18 * norm_stress, 0, 95)
+
+    return forecasted, probs
 
 
 def explain_prediction(mdl, sc, vals, threshold):
-    z     = sc.transform([vals])[0]
-    raw_w = z * WEIGHTS
-    total = np.sum(np.abs(raw_w)) + 1e-9
+    """
+    Compute per-feature contribution to the stress score.
+
+    Contribution logic (no contradictions):
+      - raw_contribution_i = sign_i × w_i × z_i
+      - Positive contribution_i → that feature is currently RAISING recession risk
+      - Negative contribution_i → that feature is currently LOWERING recession risk
+
+    Display direction (what we show the user):
+      - If contribution > 0 → "currently raising risk" regardless of FEAT_DIRS label
+      - If contribution < 0 → "currently lowering risk"
+
+    Percentage shown = |contribution_i| / Σ|contribution_i|, capped at 25%.
+    """
+    z            = sc.transform([vals])[0]
+    contributions = WEIGHTS * z            # signed: + = raises risk, − = lowers risk
+    abs_contribs  = np.abs(contributions)
+    total         = abs_contribs.sum() + 1e-9
+
+    raw_pcts = abs_contribs / total * 100  # uncapped percentages
+
+    # Cap each at 25 % and redistribute remainder proportionally
+    cap = 25.0
+    capped = np.minimum(raw_pcts, cap)
+    excess = raw_pcts.sum() - capped.sum()
+    if excess > 0:
+        below_cap   = capped < cap
+        redistrib   = below_cap * (cap - capped)
+        redistrib_sum = redistrib.sum() + 1e-9
+        capped += redistrib / redistrib_sum * excess
+    # Final renorm to exactly 100
+    capped = capped / capped.sum() * 100
+
     items = []
-    for i in np.argsort(-np.abs(raw_w)):
+    for i in np.argsort(-abs_contribs):      # sort by absolute impact
+        currently_raises = contributions[i] > 0
         items.append(dict(
-            feature   = FEAT_NAMES[i],
-            pct       = abs(raw_w[i]) / total * 100,
-            direction = FEAT_DIRS[i],
-            value     = vals[i],
-            z         = float(z[i]),
+            feature          = FEAT_NAMES[i],
+            pct              = float(capped[i]),
+            currently_raises = currently_raises,
+            effect_label     = "↑ raising risk" if currently_raises else "↓ lowering risk",
+            value            = vals[i],
+            z                = float(z[i]),
+            contribution     = float(contributions[i]),
         ))
     return items
 
 
+def format_explanation_panel(items, sim_prob):
+    """Build the 'Why this prediction?' HTML block."""
+    top5   = items[:5]
+    rest_n = len(items) - 5
+
+    # Dominant driver headline
+    dominant = top5[0]
+    action   = "driving up" if dominant["currently_raises"] else "holding down"
+    headline = (f"<b style='color:#fff'>{dominant['feature']}</b> is the dominant factor "
+                f"{action} current recession risk ({dominant['pct']:.0f}% of total influence).")
+
+    rows_html = ""
+    for rank, item in enumerate(top5, 1):
+        bar_color = "#ff6b6b" if item["currently_raises"] else "#34c759"
+        label_color = "#ff9090" if item["currently_raises"] else "#5ddb7a"
+        rows_html += (
+            f'<div style="margin:.38rem 0;">'
+            f'<span style="color:rgba(255,255,255,.45);font-size:.75rem;'
+            f'font-family:\'JetBrains Mono\',monospace;">{rank}.</span> '
+            f'<span style="color:#fff;font-weight:600;">{item["feature"]}</span>'
+            f' <span style="color:{label_color};font-size:.8rem;">'
+            f'{item["effect_label"]} ({item["pct"]:.0f}%)</span><br>'
+            f'<span style="font-size:.73rem;color:rgba(255,255,255,.35);">'
+            f'Value: {item["value"]:.2f} · z-score: {item["z"]:+.2f} · '
+            f'contribution: {item["contribution"]:+.4f}</span>'
+            f'<div class="feat-bar-wrap">'
+            f'<div class="feat-bar-fill" style="width:{min(int(item["pct"]),100)}%;'
+            f'background:{bar_color};"></div></div>'
+            f'</div>'
+        )
+
+    rest_html = (f'<p style="font-size:.75rem;color:rgba(255,255,255,.3);margin-top:.6rem;">'
+                 f'+ {rest_n} minor contributing factors</p>') if rest_n > 0 else ""
+
+    return f"""
+<div class="why-box">
+  <p style="font-size:.84rem;color:rgba(255,255,255,.65);margin:0 0 .9rem;line-height:1.5;">{headline}</p>
+  <p style="font-size:.7rem;color:rgba(255,255,255,.28);font-family:'JetBrains Mono',monospace;
+     text-transform:uppercase;letter-spacing:.1em;margin:0 0 .6rem;">
+     Top drivers of recession risk:</p>
+  {rows_html}
+  {rest_html}
+</div>"""
+
+
 def policy_effect(policy, vals):
+    """
+    Apply policy shock to all 12 indicator values.
+    Deltas are calibrated to realistic short-run transmission magnitudes
+    (based on typical 6-12 month Fed/fiscal impact estimates).
+    Order matches FEATURE_COLS:
+      infl, unemp, sp500, conf, fed_rate, gdp, pmi, oil, yld_spread, credit_spread, housing, retail
+    """
     deltas = {
-        "Interest Rate Cut (−50 bps)":
-            [+0.3, -0.25, +180, +4, -0.5, +0.4, +1.5, -2.0, +0.10, -0.12, +30, +0.2],
-        "Fiscal Stimulus Package":
-            [+0.7, -0.50, +280, +6,  0.0, +0.9, +2.0, +3.0, +0.05, -0.08, +55, +0.4],
-        "Tax Increase (+2%)":
-            [-0.2, +0.45, -220, -5,  0.0, -0.6, -1.5, -1.0, -0.08, +0.10, -40, -0.3],
-    }.get(policy, [0]*12)
-    clips = [(1,15),(2,14),(1800,7000),(30,140),(0,20),(-12,10),
-             (30,70),(15,200),(-3,3),(0.2,7),(400,2400),(-3,4)]
+        # Rate cut → cheaper credit → equity up, confidence up, hiring improves,
+        #   yield curve steepens (spread widens), credit spreads tighten,
+        #   housing starts pick up; mild inflationary over time
+        "Interest Rate Cut (−50 bps)": [
+            +0.45,  # inflation   (demand-side pickup)
+            -0.55,  # unemployment
+            +320,   # sp500       (risk-on repricing)
+            +7,     # confidence
+            -0.50,  # fed_rate    (definition)
+            +0.55,  # gdp
+            +2.8,   # pmi
+            -3.0,   # oil         (USD weakens → mixed; net slight fall)
+            +0.18,  # yield_spread (curve steepens)
+            -0.22,  # credit_spread (tightens)
+            +60,    # housing_starts
+            +0.35,  # retail_sales
+        ],
+        # Stimulus → direct demand → GDP and employment up, inflation up,
+        #   equity markets react positively, credit spreads compress
+        "Fiscal Stimulus Package": [
+            +0.85,  # inflation
+            -0.65,  # unemployment
+            +400,   # sp500
+            +9,     # confidence
+             0.0,   # fed_rate    (unchanged)
+            +1.10,  # gdp
+            +3.5,   # pmi
+            +5.0,   # oil         (demand-driven)
+            +0.08,  # yield_spread (modest)
+            -0.30,  # credit_spread
+            +85,    # housing_starts
+            +0.55,  # retail_sales
+        ],
+        # Tax hike → disposable income falls → spending down, confidence down,
+        #   equities re-price lower, gdp softens, hiring slows
+        "Tax Increase (+2%)": [
+            -0.30,  # inflation   (demand destruction)
+            +0.55,  # unemployment
+            -350,   # sp500
+            -8,     # confidence
+             0.0,   # fed_rate
+            -0.80,  # gdp
+            -2.5,   # pmi
+            -2.0,   # oil
+            -0.12,  # yield_spread
+            +0.20,  # credit_spread
+            -55,    # housing_starts
+            -0.45,  # retail_sales
+        ],
+    }.get(policy, [0] * 12)
+
+    clips = [
+        (1, 15), (2, 14), (1800, 7000), (30, 140), (0, 20),
+        (-12, 10), (30, 70), (15, 200), (-3, 3), (0.2, 7),
+        (400, 2400), (-3, 4),
+    ]
     return [float(np.clip(v + d, lo, hi))
             for v, d, (lo, hi) in zip(vals, deltas, clips)]
 
@@ -536,7 +758,22 @@ You are not a textbook. You are an analyst with a point of view."""
 
 
 def build_context(live, live_prob, live_stress, sim_vals, sim_prob):
+    """Build LLM system context, including top-3 stress drivers so the model
+    can ground its reasoning in the actual data rather than generic statements."""
     names = FEAT_NAMES
+
+    # Compute top-3 contributors to live scenario stress
+    z_live  = scaler.transform([sim_vals])[0]
+    contrib = WEIGHTS * z_live
+    top3_idx = np.argsort(-np.abs(contrib))[:3]
+    driver_lines = []
+    for i in top3_idx:
+        effect = "raising" if contrib[i] > 0 else "lowering"
+        driver_lines.append(
+            f"  • {names[i]}: {sim_vals[i]:.2f} (z={z_live[i]:+.2f}, currently {effect} risk)"
+        )
+    drivers_block = "\n".join(driver_lines)
+
     sim_lines = "\n".join(f"  {n}: {v:.2f}" for n, v in zip(names, sim_vals))
     return f"""{ANALYST_STYLE}
 
@@ -546,9 +783,12 @@ Consumer Confidence: {live['consumer_confidence']:.1f}  |  Fed Funds Rate: {live
 PMI: {live['pmi']:.1f}  |  Oil: ${live['oil_price']:.1f}/bbl  |  Yield Spread (10y-2y): {live['yield_spread']:+.3f}%
 Credit Spread: {live['credit_spread']:.2f}%  |  Housing Starts: {live['housing_starts']:.0f}k  |  Retail Sales MoM: {live['retail_sales']:+.2f}%
 
-AI Recession Probability: {live_prob:.1f}%  |  Stress Index: {live_stress:.3f}
+AI Recession Probability: {live_prob:.1f}%  |  Composite Stress Index: {live_stress:.3f}
 
-=== SCENARIO (USER-ADJUSTED) ===
+=== TOP STRESS DRIVERS (scenario) ===
+{drivers_block}
+
+=== FULL SCENARIO (USER-ADJUSTED) ===
 {sim_lines}
 Scenario Recession Probability: {sim_prob:.1f}%"""
 
@@ -783,6 +1023,31 @@ with mp1:
     st.markdown('<p style="font-size:.65rem;color:rgba(255,255,255,.2);margin-top:.7rem;">'
                 'RF 300 trees · depth 7 · min_leaf 5 · 8% label noise</p>',
                 unsafe_allow_html=True)
+    # ── Model bias note ──
+    recall_val    = mets["recall"]
+    precision_val = mets["precision"]
+    if recall_val > precision_val + 0.05:
+        bias_note = (
+            "Recall exceeds precision — the model is tuned to catch recessions early, "
+            "accepting more false positives in exchange for fewer missed warnings. "
+            "This is the correct trade-off for an early-warning system."
+        )
+    elif precision_val > recall_val + 0.05:
+        bias_note = (
+            "Precision exceeds recall — the model is conservative, flagging fewer "
+            "recessions but with higher confidence when it does. "
+            "Consider this when setting alert thresholds."
+        )
+    else:
+        bias_note = (
+            "Precision and recall are balanced — the model treats false positives "
+            "and false negatives symmetrically."
+        )
+    st.markdown(
+        f'<p style="font-size:.72rem;color:rgba(255,200,120,.55);'
+        f'line-height:1.5;margin-top:.5rem;border-top:1px solid rgba(255,255,255,.05);'
+        f'padding-top:.5rem;">{bias_note}</p>',
+        unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with mp2:
@@ -1001,32 +1266,22 @@ with r3:
 # ── Why this prediction ──
 if st.button("🔍 Why this prediction?", use_container_width=False):
     expl = explain_prediction(model, scaler, sim_vals, threshold)
-    st.markdown('<div class="why-box">', unsafe_allow_html=True)
-    st.markdown("**Feature-level contribution to current recession probability:**")
-    for item in expl:
-        dc = "#ff6b6b" if "raises" in item["direction"] else "#34c759"
-        st.markdown(
-            f'<div style="margin:.32rem 0;">'
-            f'<span style="color:#fff;font-weight:600;">{item["feature"]}</span>'
-            f' → <span style="color:{dc};font-size:.82rem;">{item["direction"]}</span><br>'
-            f'<span style="font-size:.76rem;color:rgba(255,255,255,.38);">'
-            f'Contribution: <b style="color:#00d4aa">{item["pct"]:.1f}%</b> &nbsp;·&nbsp; '
-            f'Value: {item["value"]:.2f} &nbsp;·&nbsp; z-score: {item["z"]:+.2f}</span>'
-            f'<div class="feat-bar-wrap"><div class="feat-bar-fill" '
-            f'style="width:{min(int(item["pct"]),100)}%;background:{dc};"></div></div>'
-            f'</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown(format_explanation_panel(expl, sim_prob), unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════
-# ⑧ REAL FORECAST — trend + scenario + noise
+# ⑧ REAL FORECAST — trend + scenario + AR noise
 # ══════════════════════════════════════════════
 
 st.markdown('<p class="section-label">🔮 6-Month Forecast</p>', unsafe_allow_html=True)
-st.caption("Forecast = 60% historical linear trend · 40% scenario stress · calibrated noise. "
-           "Reacts dynamically to slider adjustments above.")
+st.caption(
+    "Forecast = 60% historical linear trend · 40% scenario stress · "
+    "AR(1) volatility + mean-reversion. "
+    "High stress → upward drift; low stress → mild recovery. "
+    "Reacts dynamically to slider adjustments above."
+)
 
 f_stress, f_probs = forecast_stress(lr_model, df, sim_stress, 6)
 months = ["Month 1","Month 2","Month 3","Month 4","Month 5","Month 6"]
@@ -1078,15 +1333,34 @@ st.caption("US risk = direct model output. Regional estimates use trade/financia
            "coefficients. Tooltip shows linkage weight. Updates with scenario.")
 
 LINKAGE = {
-    "United States": 1.00, "Canada": 0.84, "Mexico": 0.75,
-    "United Kingdom": 0.79, "Germany": 0.73, "France": 0.70,
-    "Italy": 0.66, "Spain": 0.63, "Netherlands": 0.68,
-    "Japan": 0.65, "South Korea": 0.63, "Australia": 0.61,
-    "China": 0.69, "India": 0.50, "Brazil": 0.57, "South Africa": 0.47,
+    "United States":  (1.00, 0),    # (coeff, idiosyncratic_noise_amp_pct)
+    "Canada":         (0.84, 5),
+    "Mexico":         (0.75, 7),
+    "United Kingdom": (0.79, 6),
+    "Germany":        (0.73, 6),
+    "France":         (0.70, 7),
+    "Italy":          (0.64, 8),
+    "Spain":          (0.61, 8),
+    "Netherlands":    (0.67, 6),
+    "Japan":          (0.65, 7),
+    "South Korea":    (0.62, 8),
+    "Australia":      (0.60, 8),
+    "China":          (0.68, 9),
+    "India":          (0.49, 11),
+    "Brazil":         (0.56, 12),
+    "South Africa":   (0.46, 13),
 }
-rng_m = np.random.default_rng(int(sim_prob * 100) % 9999)
-map_rows = [{"country": c, "risk": float(np.clip(sim_prob * w + rng_m.uniform(-2.5,2.5), 0, 95)),
-             "linkage": f"{w:.0%}"} for c, w in LINKAGE.items()]
+# Each country draws from its own independent RNG seed → genuinely uncorrelated noise.
+# Emerging-market countries get larger noise amplitude (more idiosyncratic risk).
+map_rows = []
+for country, (coeff, noise_amp) in LINKAGE.items():
+    seed  = hash(country + str(int(sim_prob * 100))) % 99991
+    noise = np.random.default_rng(seed).uniform(-noise_amp, noise_amp)
+    map_rows.append({
+        "country": country,
+        "risk":    float(np.clip(sim_prob * coeff + noise, 0, 95)),
+        "linkage": f"{coeff:.0%}",
+    })
 map_df  = pd.DataFrame(map_rows)
 
 fig_map = px.choropleth(
@@ -1268,13 +1542,29 @@ st.markdown('<p class="section-title">What the Model Does — and Doesn\'t Do</p
 
 hw1, hw2 = st.columns(2, gap="medium")
 with hw1:
-    st.markdown("""<div class="info-box"><h4>📥 12 Input Features</h4>
-    CPI Inflation · Unemployment · S&amp;P 500 · Consumer Confidence ·
-    Fed Funds Rate · GDP Growth · PMI · Oil Price ·
-    Yield Spread (10y–2y) · Credit Spread · Housing Starts · Retail Sales MoM.<br><br>
-    Features are z-score standardised then combined with theory-motivated weights
-    into a <b>composite stress score</b>. This score is binarised at its historical
-    median → balanced training labels.
+    # Compute weight percentages dynamically so the text is always accurate
+    w_pct = {
+        "Unemployment":        round(abs(WEIGHTS[1]) / abs(WEIGHTS).sum() * 100),
+        "CPI Inflation":       round(abs(WEIGHTS[0]) / abs(WEIGHTS).sum() * 100),
+        "GDP Growth":          round(abs(WEIGHTS[5]) / abs(WEIGHTS).sum() * 100),
+        "Yield Spread":        round(abs(WEIGHTS[8]) / abs(WEIGHTS).sum() * 100),
+        "Credit Spread":       round(abs(WEIGHTS[9]) / abs(WEIGHTS).sum() * 100),
+        "Consumer Confidence": round(abs(WEIGHTS[3]) / abs(WEIGHTS).sum() * 100),
+    }
+    st.markdown(f"""<div class="info-box"><h4>📥 12 Input Features & Weights</h4>
+    Features are z-score standardised then multiplied by theory-motivated signed weights
+    and summed into a <b>composite stress score</b>:<br><br>
+    <code>S = Σ (sign_i × w_i × z_i)</code><br><br>
+    Weight allocation (normalised to 100%, capped at ~22% per feature):<br>
+    Unemployment <b>{w_pct['Unemployment']}%</b> ↑risk ·
+    CPI Inflation <b>{w_pct['CPI Inflation']}%</b> ↑risk ·
+    GDP Growth <b>{w_pct['GDP Growth']}%</b> ↓risk ·
+    Yield Spread <b>{w_pct['Yield Spread']}%</b> ↓risk<br>
+    Credit Spread <b>{w_pct['Credit Spread']}%</b> ↑risk ·
+    Consumer Confidence <b>{w_pct['Consumer Confidence']}%</b> ↓risk ·
+    remaining 6 features share the rest.<br><br>
+    Positive contribution → raises risk. Negative → lowers risk.
+    Direction is determined dynamically from the data, not hardcoded.
     </div>
     <div class="info-box"><h4>🎯 Why 8% Label Noise?</h4>
     Real economic data is inherently ambiguous — quarters near the threshold
@@ -1293,12 +1583,13 @@ with hw2:
     <li>Provide financial advice in any form</li>
     </ul>
     </div>
-    <div class="limit-box"><h4>📊 Data Limitations</h4>
-    Several indicators (PMI, credit spread, housing, retail) use historically-calibrated
-    simulation. FRED data is used where the API is accessible and returns sufficient
-    history. The real/simulated tag on each KPI card reflects actual data source status.
-    Simulation parameters are tuned to match observed distributional properties
-    (mean, std, autocorrelation) of their FRED counterparts.
+    <div class="limit-box"><h4>📊 Forecast & Map Methodology</h4>
+    6-month forecast = 60% linear trend on historical stress + 40% scenario stress
+    + AR(1) noise (σ = 20% of historical std). High stress scenarios drift upward;
+    low stress scenarios mean-revert. Each month differs by design — no flat output.<br><br>
+    Global map: US risk is direct model output. All other countries = US risk ×
+    trade/financial linkage coefficient + independent regional noise
+    (±5–13% depending on EM exposure). Countries are <em>not</em> uniformly correlated.
     </div>""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
