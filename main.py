@@ -537,95 +537,148 @@ def forecast_stress(lr_mdl, df, sim_stress, n=6):
     return forecasted, probs
 
 
-def explain_prediction(mdl, sc, vals, threshold):
+def explain_prediction(sc, vals):
     """
-    Compute per-feature contribution to the stress score.
+    Compute per-feature contribution to the composite stress score.
 
-    Contribution logic (no contradictions):
-      - raw_contribution_i = sign_i × w_i × z_i
-      - Positive contribution_i → that feature is currently RAISING recession risk
-      - Negative contribution_i → that feature is currently LOWERING recession risk
+    Formula (single source of truth — no string labels, no static lookup):
+        z_i          = StandardScaler z-score of feature i
+        contribution_i = _SIGNS[i] × _RAW_W[i] × z_i
 
-    Display direction (what we show the user):
-      - If contribution > 0 → "currently raising risk" regardless of FEAT_DIRS label
-      - If contribution < 0 → "currently lowering risk"
+    This equals WEIGHTS[i] × z_i, which is the exact term summed to produce
+    the stress score, so contributions sum to the stress score itself.
 
-    Percentage shown = |contribution_i| / Σ|contribution_i|, capped at 25%.
+    Interpretation (derived entirely from the sign of contribution_i):
+        contribution_i > 0  →  currently RAISING recession risk
+        contribution_i < 0  →  currently LOWERING recession risk
+        contribution_i == 0 →  neutral (rare; only when z_i == 0)
+
+    Why this is always economically correct:
+        CPI Inflation: _SIGNS[0] = +1.
+            If inflation is above average → z > 0 → contribution > 0 → raises risk  ✓
+            If inflation is below average → z < 0 → contribution < 0 → lowers risk  ✓
+        Consumer Confidence: _SIGNS[3] = -1.
+            If confidence is high → z > 0 → contribution = -1 × w × z < 0 → lowers risk  ✓
+            If confidence is low  → z < 0 → contribution = -1 × w × z > 0 → raises risk  ✓
+        Yield Spread: _SIGNS[8] = -1.
+            Normal curve (spread > 0) → z > 0 → contribution < 0 → lowers risk  ✓
+            Inverted curve (spread < 0) → z < 0 → contribution > 0 → raises risk  ✓
+
+    The label "currently raising/lowering risk" is ALWAYS computed from the sign
+    of contribution_i — never from FEAT_DIRS or any static string.
+
+    Percentage shown = |contribution_i| / Σ|contribution_i|, capped at 25%
+    with proportional redistribution.
     """
-    z            = sc.transform([vals])[0]
-    contributions = WEIGHTS * z            # signed: + = raises risk, − = lowers risk
-    abs_contribs  = np.abs(contributions)
-    total         = abs_contribs.sum() + 1e-9
+    z             = sc.transform([vals])[0]
+    # Core formula: contribution_i = SIGNS[i] × RAW_W[i] × z[i]
+    contributions = _SIGNS * _RAW_W * z
 
-    raw_pcts = abs_contribs / total * 100  # uncapped percentages
+    abs_c = np.abs(contributions)
+    total = abs_c.sum() + 1e-9
 
-    # Cap each at 25 % and redistribute remainder proportionally
-    cap = 25.0
-    capped = np.minimum(raw_pcts, cap)
-    excess = raw_pcts.sum() - capped.sum()
+    # Cap individual percentages at 25%; redistribute proportionally
+    raw_pcts = abs_c / total * 100
+    cap      = 25.0
+    capped   = np.minimum(raw_pcts, cap)
+    excess   = raw_pcts.sum() - capped.sum()
     if excess > 0:
-        below_cap   = capped < cap
-        redistrib   = below_cap * (cap - capped)
-        redistrib_sum = redistrib.sum() + 1e-9
-        capped += redistrib / redistrib_sum * excess
-    # Final renorm to exactly 100
-    capped = capped / capped.sum() * 100
+        below     = capped < cap
+        headroom  = below * (cap - capped)
+        capped   += headroom / (headroom.sum() + 1e-9) * excess
+    capped = capped / capped.sum() * 100  # renorm to exactly 100 %
 
     items = []
-    for i in np.argsort(-abs_contribs):      # sort by absolute impact
-        currently_raises = contributions[i] > 0
+    for i in np.argsort(-abs_c):
+        # ── Single truth: sign of contribution determines direction ──
+        raises = bool(contributions[i] > 0)
+
+        # Build a short plain-language reason that references the actual value
+        val = vals[i]
+        z_i = float(z[i])
+        if raises:
+            reason = (f"{FEAT_NAMES[i]} ({val:.2f}) is "
+                      f"{'above' if z_i > 0 else 'below'} its historical average "
+                      f"in a way that adds stress")
+        else:
+            reason = (f"{FEAT_NAMES[i]} ({val:.2f}) is "
+                      f"{'above' if z_i > 0 else 'below'} its historical average "
+                      f"in a way that reduces stress")
+
         items.append(dict(
-            feature          = FEAT_NAMES[i],
-            pct              = float(capped[i]),
-            currently_raises = currently_raises,
-            effect_label     = "↑ raising risk" if currently_raises else "↓ lowering risk",
-            value            = vals[i],
-            z                = float(z[i]),
-            contribution     = float(contributions[i]),
+            feature      = FEAT_NAMES[i],
+            pct          = float(capped[i]),
+            raises       = raises,
+            effect_label = "raising risk" if raises else "lowering risk",
+            reason       = reason,
+            value        = val,
+            z            = z_i,
+            contribution = float(contributions[i]),
         ))
     return items
 
 
 def format_explanation_panel(items, sim_prob):
-    """Build the 'Why this prediction?' HTML block."""
+    """
+    Render the 'Why this prediction?' panel.
+
+    All colours, labels, and bar directions derive exclusively from
+    item['raises'] (bool), which itself derives from the sign of contribution_i.
+    No static string look-up is used anywhere in this function.
+    """
     top5   = items[:5]
     rest_n = len(items) - 5
 
-    # Dominant driver headline
-    dominant = top5[0]
-    action   = "driving up" if dominant["currently_raises"] else "holding down"
-    headline = (f"<b style='color:#fff'>{dominant['feature']}</b> is the dominant factor "
-                f"{action} current recession risk ({dominant['pct']:.0f}% of total influence).")
+    # ── Dominant-driver headline ──
+    dom     = top5[0]
+    dom_verb = "pushing up" if dom["raises"] else "holding down"
+    headline = (
+        f"<b style='color:#fff'>{dom['feature']}</b> is the dominant factor "
+        f"<span style='color:{'#ff9090' if dom['raises'] else '#5ddb7a'}'>"
+        f"{dom_verb}</span> recession risk "
+        f"({dom['pct']:.0f}% of total model influence)."
+    )
 
+    # ── Per-feature rows (top 5) ──
     rows_html = ""
     for rank, item in enumerate(top5, 1):
-        bar_color = "#ff6b6b" if item["currently_raises"] else "#34c759"
-        label_color = "#ff9090" if item["currently_raises"] else "#5ddb7a"
+        bar_color   = "#ff6b6b" if item["raises"] else "#34c759"
+        label_color = "#ff9090" if item["raises"] else "#5ddb7a"
+        sign_char   = "+" if item["raises"] else "−"
         rows_html += (
-            f'<div style="margin:.38rem 0;">'
-            f'<span style="color:rgba(255,255,255,.45);font-size:.75rem;'
-            f'font-family:\'JetBrains Mono\',monospace;">{rank}.</span> '
-            f'<span style="color:#fff;font-weight:600;">{item["feature"]}</span>'
-            f' <span style="color:{label_color};font-size:.8rem;">'
-            f'{item["effect_label"]} ({item["pct"]:.0f}%)</span><br>'
-            f'<span style="font-size:.73rem;color:rgba(255,255,255,.35);">'
-            f'Value: {item["value"]:.2f} · z-score: {item["z"]:+.2f} · '
-            f'contribution: {item["contribution"]:+.4f}</span>'
-            f'<div class="feat-bar-wrap">'
+            f'<div style="margin:.45rem 0 .5rem;">'
+            f'<div style="display:flex;align-items:baseline;gap:.4rem;">'
+            f'<span style="color:rgba(255,255,255,.38);font-size:.72rem;'
+            f'font-family:\'JetBrains Mono\',monospace;min-width:1.2rem;">{rank}.</span>'
+            f'<span style="color:#fff;font-weight:600;font-size:.88rem;">'
+            f'{item["feature"]}</span>'
+            f'<span style="color:{label_color};font-size:.78rem;margin-left:.25rem;">'
+            f'({sign_char}{item["pct"]:.0f}%) {item["effect_label"]}</span>'
+            f'</div>'
+            f'<div style="font-size:.71rem;color:rgba(255,255,255,.32);'
+            f'padding-left:1.6rem;margin:.1rem 0 .25rem;">'
+            f'Value: <b style="color:rgba(255,255,255,.6)">{item["value"]:.2f}</b> · '
+            f'z-score: <b style="color:rgba(255,255,255,.6)">{item["z"]:+.2f}</b> · '
+            f'contribution: <b style="color:{label_color}">{item["contribution"]:+.4f}</b>'
+            f'</div>'
+            f'<div style="margin-left:1.6rem;" class="feat-bar-wrap">'
             f'<div class="feat-bar-fill" style="width:{min(int(item["pct"]),100)}%;'
-            f'background:{bar_color};"></div></div>'
+            f'background:{bar_color};opacity:.85;"></div></div>'
             f'</div>'
         )
 
-    rest_html = (f'<p style="font-size:.75rem;color:rgba(255,255,255,.3);margin-top:.6rem;">'
-                 f'+ {rest_n} minor contributing factors</p>') if rest_n > 0 else ""
+    rest_html = (
+        f'<p style="font-size:.72rem;color:rgba(255,255,255,.28);margin-top:.7rem;">'
+        f'+ {rest_n} minor contributing factors not shown</p>'
+    ) if rest_n > 0 else ""
 
     return f"""
 <div class="why-box">
-  <p style="font-size:.84rem;color:rgba(255,255,255,.65);margin:0 0 .9rem;line-height:1.5;">{headline}</p>
-  <p style="font-size:.7rem;color:rgba(255,255,255,.28);font-family:'JetBrains Mono',monospace;
-     text-transform:uppercase;letter-spacing:.1em;margin:0 0 .6rem;">
-     Top drivers of recession risk:</p>
+  <p style="font-size:.83rem;color:rgba(255,255,255,.62);margin:0 0 .9rem;
+     line-height:1.55;">{headline}</p>
+  <p style="font-size:.65rem;color:rgba(255,255,255,.25);
+     font-family:'JetBrains Mono',monospace;text-transform:uppercase;
+     letter-spacing:.12em;margin:0 0 .55rem;">Top 5 drivers of recession risk:</p>
   {rows_html}
   {rest_html}
 </div>"""
@@ -762,9 +815,11 @@ def build_context(live, live_prob, live_stress, sim_vals, sim_prob):
     can ground its reasoning in the actual data rather than generic statements."""
     names = FEAT_NAMES
 
-    # Compute top-3 contributors to live scenario stress
+    # Compute top-3 contributors using the same formula as explain_prediction
+    # contribution_i = _SIGNS[i] × _RAW_W[i] × z[i]
+    # Positive = raising risk, Negative = lowering risk (no exceptions)
     z_live  = scaler.transform([sim_vals])[0]
-    contrib = WEIGHTS * z_live
+    contrib = _SIGNS * _RAW_W * z_live
     top3_idx = np.argsort(-np.abs(contrib))[:3]
     driver_lines = []
     for i in top3_idx:
@@ -1265,7 +1320,7 @@ with r3:
 
 # ── Why this prediction ──
 if st.button("🔍 Why this prediction?", use_container_width=False):
-    expl = explain_prediction(model, scaler, sim_vals, threshold)
+    expl = explain_prediction(scaler, sim_vals)
     st.markdown(format_explanation_panel(expl, sim_prob), unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
