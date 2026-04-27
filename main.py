@@ -340,80 +340,230 @@ FEATURE_COLS = [
     "yield_spread","credit_spread","housing_starts","retail_sales",
 ]
 
-# ──────────────────────────────────────────────────────────
-# FEATURE WEIGHTS  (theory-motivated, normalized so each
-#  |weight| / Σ|weights| ≤ 0.25, preventing any single
-#  feature from dominating the stress score)
-# ──────────────────────────────────────────────────────────
-# Raw magnitudes (all positive; sign applied separately):
-#   unemployment 22%, inflation 20%, gdp 16%, yield 13%,
-#   credit spread 11%, confidence 9%, sp500 8%, pmi 6%,
-#   fed rate 5%, oil 5%, housing 4%, retail 3%  → ∑ = 100%
-# Stress score = Σ (sign_i × w_i × z_i)
-# Positive contribution → raises risk; negative → lowers risk.
-# Note on yield_spread: spread is stored as (10y − 2y).
-#   Inversion means spread < 0 → z_spread < 0.
-#   Weight is −0.78: z_spread negative × (−0.78) = positive → raises risk. ✓
+# ══════════════════════════════════════════════════════════════
+# FEATURE CONTRIBUTION SYSTEM
+# ══════════════════════════════════════════════════════════════
+#
+# DIRECTION is FIXED and UNCONDITIONAL — no conditional z logic.
+#   +1 = higher value ALWAYS raises recession risk
+#   -1 = higher value ALWAYS lowers recession risk
+#
+# Formula (used in explain_prediction and build_context):
+#   z_i = clip((value_i - MACRO_MEAN[i]) / MACRO_STD[i], -3, +3)
+#   contribution_i = DIRECTION[i] * WEIGHT[i] * z_i
+#   contribution_i > 0  → "raising risk"   (always correct by construction)
+#   contribution_i < 0  → "lowering risk"  (always correct by construction)
+#
+# The stress score used in ML training still uses the fitted StandardScaler
+# (build_df / stress_from_vals) for scale consistency with the Random Forest.
+# The explanation panel uses MACRO_MEAN/MACRO_STD to keep z-scores in [-3,+3].
+# ══════════════════════════════════════════════════════════════
 
-_RAW_W = np.array([
-    0.20,  # inflation
-    0.22,  # unemployment
-    0.08,  # sp500
-    0.09,  # consumer_confidence
-    0.05,  # fed_funds_rate
-    0.16,  # gdp_growth
-    0.06,  # pmi
-    0.05,  # oil_price
-    0.13,  # yield_spread
-    0.11,  # credit_spread
-    0.04,  # housing_starts
-    0.03,  # retail_sales
-], dtype=float)
-_RAW_W /= _RAW_W.sum()   # normalise to exactly 1.0
-
-# Economic direction signs:
-#   +1 → higher value raises recession risk (inflation, unemp, fed rate, oil, credit spread)
-#   −1 → higher value lowers recession risk (sp500, confidence, gdp, pmi, housing, retail)
-#   yield_spread sign is −1: higher spread (steeper curve) lowers risk; inversion (neg spread)
-#     produces negative z → (−1) × (−z) = positive contribution → raises risk ✓
-_SIGNS = np.array([
-    +1,  # inflation       ↑ raises risk
-    +1,  # unemployment    ↑ raises risk
-    -1,  # sp500           ↑ lowers risk
-    -1,  # consumer_confidence ↑ lowers risk
-    +1,  # fed_funds_rate  ↑ raises risk (monetary tightening)
-    -1,  # gdp_growth      ↑ lowers risk
-    -1,  # pmi             ↑ lowers risk (expansion signal)
-    +1,  # oil_price       ↑ raises risk (cost-push)
-    -1,  # yield_spread    ↑ lowers risk; inversion (neg) raises risk ✓
-    +1,  # credit_spread   ↑ raises risk (default premium)
-    -1,  # housing_starts  ↑ lowers risk (construction activity)
-    -1,  # retail_sales    ↑ lowers risk (consumer demand)
-], dtype=float)
-
-WEIGHTS = _SIGNS * _RAW_W   # final signed weights
-
-# Human-readable labels — consistent with SIGNS above
 FEAT_NAMES = [
-    "CPI Inflation", "Unemployment", "S&P 500", "Consumer Confidence",
-    "Fed Funds Rate", "GDP Growth", "PMI", "Oil Price",
-    "Yield Spread (10y-2y)", "Credit Spread", "Housing Starts", "Retail Sales",
-]
-FEAT_DIRS = [
-    "↑ raises risk",              # inflation
-    "↑ raises risk",              # unemployment
-    "↑ lowers risk",              # sp500
-    "↑ lowers risk",              # confidence
-    "↑ raises risk",              # fed rate
-    "↑ lowers risk",              # gdp
-    "↑ lowers risk",              # pmi
-    "↑ raises risk",              # oil
-    "↓ inversion raises risk",    # yield_spread (negative z → higher risk)
-    "↑ raises risk",              # credit spread
-    "↑ lowers risk",              # housing starts
-    "↑ lowers risk",              # retail sales
+    "CPI Inflation",         # 0
+    "Unemployment",          # 1
+    "S&P 500",               # 2
+    "Consumer Confidence",   # 3
+    "Fed Funds Rate",        # 4
+    "GDP Growth",            # 5
+    "PMI",                   # 6
+    "Oil Price",             # 7
+    "Yield Spread (10y-2y)", # 8
+    "Credit Spread",         # 9
+    "Housing Starts",        # 10
+    "Retail Sales",          # 11
 ]
 
+# DIRECTION: fixed, unconditional economic sign per feature
+DIRECTION = np.array([
+    +1,   # CPI Inflation:       ↑ ALWAYS raises risk
+    +1,   # Unemployment:        ↑ ALWAYS raises risk
+    -1,   # S&P 500:             ↑ ALWAYS lowers risk
+    -1,   # Consumer Confidence: ↑ ALWAYS lowers risk
+    +1,   # Fed Funds Rate:      ↑ ALWAYS raises risk (monetary tightening)
+    -1,   # GDP Growth:          ↑ ALWAYS lowers risk
+    -1,   # PMI:                 ↑ ALWAYS lowers risk (expansion signal)
+    +1,   # Oil Price:           ↑ ALWAYS raises risk (cost-push inflation)
+    -1,   # Yield Spread:        ↑ ALWAYS lowers risk; inversion (negative) raises risk
+    +1,   # Credit Spread:       ↑ ALWAYS raises risk (default premium widening)
+    -1,   # Housing Starts:      ↑ ALWAYS lowers risk (construction activity)
+    -1,   # Retail Sales:        ↑ ALWAYS lowers risk (consumer demand signal)
+], dtype=float)
+
+# RAW weight magnitudes (all positive) — economic importance ordering
+_RAW_W = np.array([
+    0.20,  # CPI Inflation
+    0.22,  # Unemployment      (highest: labor is strongest recession signal)
+    0.08,  # S&P 500
+    0.09,  # Consumer Confidence
+    0.05,  # Fed Funds Rate
+    0.16,  # GDP Growth        (second: directly measures output)
+    0.06,  # PMI
+    0.05,  # Oil Price
+    0.13,  # Yield Spread      (third: historically reliable recession predictor)
+    0.11,  # Credit Spread
+    0.04,  # Housing Starts
+    0.03,  # Retail Sales
+], dtype=float)
+_RAW_W /= _RAW_W.sum()  # normalise to 1.0 (max weight ≈ 0.18)
+
+# Combined signed weights for the stress score (used in ML pipeline)
+WEIGHTS = DIRECTION * _RAW_W
+
+# ── Realistic macro normalisation constants ───────────────────
+# Used ONLY in explain_prediction (explanation panel).
+# Derived from post-1990 US historical data.
+# Ensures z-scores stay within [-3, +3] for all realistic input values.
+MACRO_MEAN = np.array([
+    3.0,    # CPI Inflation (%)            post-1990 avg ~2.5-3.5
+    5.5,    # Unemployment (%)             post-1990 avg ~5-6
+    3500,   # S&P 500 index level          rough mid-range 2000-2024
+    90,     # Consumer Confidence (UMich)  historical avg ~88-92
+    3.5,    # Fed Funds Rate (%)           post-1990 avg
+    2.5,    # GDP Growth (%)               post-1990 avg
+    51.5,   # PMI                          expansion midpoint
+    70,     # Oil Price ($/bbl)            post-2000 avg
+    0.8,    # Yield Spread (10y-2y, %)     typical positive spread
+    1.5,    # Credit Spread (%)            IG spread historical avg
+    1400,   # Housing Starts (thousands)   post-1990 avg
+    0.3,    # Retail Sales MoM (%)         typical monthly change
+], dtype=float)
+
+MACRO_STD = np.array([
+    1.5,    # CPI Inflation       1σ ≈ 1.5%  → z=+2 at 6% inflation
+    1.5,    # Unemployment        1σ ≈ 1.5%  → z=+2 at 8.5% unemployment
+    800,    # S&P 500             1σ ≈ 800   → z=+2 at 5100
+    15,     # Consumer Confidence 1σ ≈ 15    → z=-2 at 60
+    2.0,    # Fed Funds Rate      1σ ≈ 2.0%  → z=+2 at 7.5%
+    2.0,    # GDP Growth          1σ ≈ 2.0%  → z=-2 at -1.5% (recession)
+    5.0,    # PMI                 1σ ≈ 5     → z=-2 at 41.5 (contraction)
+    20,     # Oil Price           1σ ≈ $20   → z=+2 at $110
+    0.8,    # Yield Spread        1σ ≈ 0.8%  → z=-2 at -0.8% (inversion)
+    0.8,    # Credit Spread       1σ ≈ 0.8%  → z=+2 at 3.1%
+    200,    # Housing Starts      1σ ≈ 200k  → z=-2 at 1000k
+    0.5,    # Retail Sales        1σ ≈ 0.5%  → z=-2 at -0.7%
+], dtype=float)
+
+
+def compute_contributions(vals):
+    """
+    Compute signed per-feature risk contributions from raw indicator values.
+
+    z_i = clip((val_i - MACRO_MEAN[i]) / MACRO_STD[i], -3, +3)
+    contribution_i = DIRECTION[i] * _RAW_W[i] * z_i
+
+    Returns:
+        contributions: array of signed floats (+raises risk / -lowers risk)
+        z_scores: array of clipped z-scores in [-3, +3]
+    """
+    vals_arr = np.asarray(vals, dtype=float)
+    z = np.clip((vals_arr - MACRO_MEAN) / MACRO_STD, -3.0, +3.0)
+    return DIRECTION * _RAW_W * z, z
+
+
+def explain_prediction(vals):
+    """
+    Produce ordered list of feature contribution dicts.
+    Uses compute_contributions() — independent of the fitted scaler.
+    Direction label is ALWAYS derived from sign of contribution, never from static strings.
+    """
+    contributions, z_scores = compute_contributions(vals)
+    abs_c = np.abs(contributions)
+    total = abs_c.sum() + 1e-9
+
+    raw_pcts = abs_c / total * 100
+    cap      = 25.0
+    capped   = np.minimum(raw_pcts, cap)
+    excess   = raw_pcts.sum() - capped.sum()
+    if excess > 0:
+        headroom  = (cap - capped) * (capped < cap)
+        capped   += headroom / (headroom.sum() + 1e-9) * excess
+    capped = capped / capped.sum() * 100  # exactly 100%
+
+    items = []
+    for i in np.argsort(-abs_c):
+        raises = bool(contributions[i] > 0)  # sole truth: sign of contribution
+        items.append(dict(
+            feature      = FEAT_NAMES[i],
+            direction    = int(DIRECTION[i]),   # fixed economic direction
+            pct          = float(capped[i]),
+            raises       = raises,              # derived from contribution sign
+            effect_label = "raising risk" if raises else "lowering risk",
+            value        = float(vals[i]),
+            z            = float(z_scores[i]),  # clipped to [-3, +3]
+            contribution = float(contributions[i]),
+        ))
+    return items
+
+
+def format_explanation_panel(items, sim_prob):
+    """
+    Render 'Why this prediction?' panel.
+    All colours/labels/bars derive solely from item['raises'] (bool).
+    No conditional z-score logic. No static string direction lookup.
+    """
+    top5   = items[:5]
+    rest_n = len(items) - 5
+
+    dom      = top5[0]
+    dom_verb = "pushing up" if dom["raises"] else "holding down"
+    dom_col  = "#ff9090" if dom["raises"] else "#5ddb7a"
+    headline = (
+        f"<b style='color:#fff'>{dom['feature']}</b> is the dominant factor "
+        f"<span style='color:{dom_col}'>{dom_verb}</span> recession risk "
+        f"({dom['pct']:.0f}% of total influence)."
+    )
+
+    rows_html = ""
+    for rank, item in enumerate(top5, 1):
+        bar_color   = "#ff6b6b" if item["raises"] else "#34c759"
+        label_color = "#ff9090" if item["raises"] else "#5ddb7a"
+        sign_char   = "+" if item["raises"] else "−"
+        # Show the fixed economic direction as reference context
+        if item["feature"] == "Yield Spread (10y-2y)":
+            dir_note = "inversion (lower spread) → raises risk"
+        elif item["direction"] == +1:
+            dir_note = f"↑ value always raises risk"
+        else:
+            dir_note = f"↑ value always lowers risk"
+
+        rows_html += (
+            f'<div style="margin:.45rem 0 .55rem;">'
+            f'<div style="display:flex;align-items:baseline;gap:.4rem;flex-wrap:wrap;">'
+            f'<span style="color:rgba(255,255,255,.32);font-size:.7rem;'
+            f'font-family:"JetBrains Mono",monospace;min-width:1.1rem;">{rank}.</span>'
+            f'<span style="color:#fff;font-weight:600;font-size:.87rem;">{item["feature"]}</span>'
+            f'<span style="color:{label_color};font-size:.76rem;margin-left:.2rem;">'
+            f'({sign_char}{item["pct"]:.0f}%) {item["effect_label"]}</span>'
+            f'</div>'
+            f'<div style="font-size:.68rem;color:rgba(255,255,255,.28);'
+            f'padding-left:1.4rem;margin:.06rem 0 .2rem;line-height:1.5;">'
+            f'Value: <b style="color:rgba(255,255,255,.65)">{item["value"]:.2f}</b> · '
+            f'z-score: <b style="color:rgba(255,255,255,.65)">{item["z"]:+.2f}</b> · '
+            f'contribution: <b style="color:{label_color}">{item["contribution"]:+.4f}</b>'
+            f'<br><span style="color:rgba(255,255,255,.18)">{dir_note}</span>'
+            f'</div>'
+            f'<div style="margin-left:1.4rem;" class="feat-bar-wrap">'
+            f'<div class="feat-bar-fill" style="width:{min(int(item["pct"]),100)}%;'
+            f'background:{bar_color};opacity:.82;"></div></div>'
+            f'</div>'
+        )
+
+    rest_html = (
+        f'<p style="font-size:.68rem;color:rgba(255,255,255,.22);margin-top:.6rem;">'
+        f'+ {rest_n} minor contributing factors not shown</p>'
+    ) if rest_n > 0 else ""
+
+    return f"""
+<div class="why-box">
+  <p style="font-size:.83rem;color:rgba(255,255,255,.62);margin:0 0 .85rem;
+     line-height:1.55;">{headline}</p>
+  <p style="font-size:.62rem;color:rgba(255,255,255,.2);
+     font-family:'JetBrains Mono',monospace;text-transform:uppercase;
+     letter-spacing:.12em;margin:0 0 .5rem;">Top 5 drivers of recession risk:</p>
+  {rows_html}
+  {rest_html}
+</div>"""
 
 def build_df(series):
     df = pd.DataFrame({c: series[c] for c in FEATURE_COLS})
@@ -536,152 +686,6 @@ def forecast_stress(lr_mdl, df, sim_stress, n=6):
 
     return forecasted, probs
 
-
-def explain_prediction(sc, vals):
-    """
-    Compute per-feature contribution to the composite stress score.
-
-    Formula (single source of truth — no string labels, no static lookup):
-        z_i          = StandardScaler z-score of feature i
-        contribution_i = _SIGNS[i] × _RAW_W[i] × z_i
-
-    This equals WEIGHTS[i] × z_i, which is the exact term summed to produce
-    the stress score, so contributions sum to the stress score itself.
-
-    Interpretation (derived entirely from the sign of contribution_i):
-        contribution_i > 0  →  currently RAISING recession risk
-        contribution_i < 0  →  currently LOWERING recession risk
-        contribution_i == 0 →  neutral (rare; only when z_i == 0)
-
-    Why this is always economically correct:
-        CPI Inflation: _SIGNS[0] = +1.
-            If inflation is above average → z > 0 → contribution > 0 → raises risk  ✓
-            If inflation is below average → z < 0 → contribution < 0 → lowers risk  ✓
-        Consumer Confidence: _SIGNS[3] = -1.
-            If confidence is high → z > 0 → contribution = -1 × w × z < 0 → lowers risk  ✓
-            If confidence is low  → z < 0 → contribution = -1 × w × z > 0 → raises risk  ✓
-        Yield Spread: _SIGNS[8] = -1.
-            Normal curve (spread > 0) → z > 0 → contribution < 0 → lowers risk  ✓
-            Inverted curve (spread < 0) → z < 0 → contribution > 0 → raises risk  ✓
-
-    The label "currently raising/lowering risk" is ALWAYS computed from the sign
-    of contribution_i — never from FEAT_DIRS or any static string.
-
-    Percentage shown = |contribution_i| / Σ|contribution_i|, capped at 25%
-    with proportional redistribution.
-    """
-    z             = sc.transform([vals])[0]
-    # Core formula: contribution_i = SIGNS[i] × RAW_W[i] × z[i]
-    contributions = _SIGNS * _RAW_W * z
-
-    abs_c = np.abs(contributions)
-    total = abs_c.sum() + 1e-9
-
-    # Cap individual percentages at 25%; redistribute proportionally
-    raw_pcts = abs_c / total * 100
-    cap      = 25.0
-    capped   = np.minimum(raw_pcts, cap)
-    excess   = raw_pcts.sum() - capped.sum()
-    if excess > 0:
-        below     = capped < cap
-        headroom  = below * (cap - capped)
-        capped   += headroom / (headroom.sum() + 1e-9) * excess
-    capped = capped / capped.sum() * 100  # renorm to exactly 100 %
-
-    items = []
-    for i in np.argsort(-abs_c):
-        # ── Single truth: sign of contribution determines direction ──
-        raises = bool(contributions[i] > 0)
-
-        # Build a short plain-language reason that references the actual value
-        val = vals[i]
-        z_i = float(z[i])
-        if raises:
-            reason = (f"{FEAT_NAMES[i]} ({val:.2f}) is "
-                      f"{'above' if z_i > 0 else 'below'} its historical average "
-                      f"in a way that adds stress")
-        else:
-            reason = (f"{FEAT_NAMES[i]} ({val:.2f}) is "
-                      f"{'above' if z_i > 0 else 'below'} its historical average "
-                      f"in a way that reduces stress")
-
-        items.append(dict(
-            feature      = FEAT_NAMES[i],
-            pct          = float(capped[i]),
-            raises       = raises,
-            effect_label = "raising risk" if raises else "lowering risk",
-            reason       = reason,
-            value        = val,
-            z            = z_i,
-            contribution = float(contributions[i]),
-        ))
-    return items
-
-
-def format_explanation_panel(items, sim_prob):
-    """
-    Render the 'Why this prediction?' panel.
-
-    All colours, labels, and bar directions derive exclusively from
-    item['raises'] (bool), which itself derives from the sign of contribution_i.
-    No static string look-up is used anywhere in this function.
-    """
-    top5   = items[:5]
-    rest_n = len(items) - 5
-
-    # ── Dominant-driver headline ──
-    dom     = top5[0]
-    dom_verb = "pushing up" if dom["raises"] else "holding down"
-    headline = (
-        f"<b style='color:#fff'>{dom['feature']}</b> is the dominant factor "
-        f"<span style='color:{'#ff9090' if dom['raises'] else '#5ddb7a'}'>"
-        f"{dom_verb}</span> recession risk "
-        f"({dom['pct']:.0f}% of total model influence)."
-    )
-
-    # ── Per-feature rows (top 5) ──
-    rows_html = ""
-    for rank, item in enumerate(top5, 1):
-        bar_color   = "#ff6b6b" if item["raises"] else "#34c759"
-        label_color = "#ff9090" if item["raises"] else "#5ddb7a"
-        sign_char   = "+" if item["raises"] else "−"
-        rows_html += (
-            f'<div style="margin:.45rem 0 .5rem;">'
-            f'<div style="display:flex;align-items:baseline;gap:.4rem;">'
-            f'<span style="color:rgba(255,255,255,.38);font-size:.72rem;'
-            f'font-family:\'JetBrains Mono\',monospace;min-width:1.2rem;">{rank}.</span>'
-            f'<span style="color:#fff;font-weight:600;font-size:.88rem;">'
-            f'{item["feature"]}</span>'
-            f'<span style="color:{label_color};font-size:.78rem;margin-left:.25rem;">'
-            f'({sign_char}{item["pct"]:.0f}%) {item["effect_label"]}</span>'
-            f'</div>'
-            f'<div style="font-size:.71rem;color:rgba(255,255,255,.32);'
-            f'padding-left:1.6rem;margin:.1rem 0 .25rem;">'
-            f'Value: <b style="color:rgba(255,255,255,.6)">{item["value"]:.2f}</b> · '
-            f'z-score: <b style="color:rgba(255,255,255,.6)">{item["z"]:+.2f}</b> · '
-            f'contribution: <b style="color:{label_color}">{item["contribution"]:+.4f}</b>'
-            f'</div>'
-            f'<div style="margin-left:1.6rem;" class="feat-bar-wrap">'
-            f'<div class="feat-bar-fill" style="width:{min(int(item["pct"]),100)}%;'
-            f'background:{bar_color};opacity:.85;"></div></div>'
-            f'</div>'
-        )
-
-    rest_html = (
-        f'<p style="font-size:.72rem;color:rgba(255,255,255,.28);margin-top:.7rem;">'
-        f'+ {rest_n} minor contributing factors not shown</p>'
-    ) if rest_n > 0 else ""
-
-    return f"""
-<div class="why-box">
-  <p style="font-size:.83rem;color:rgba(255,255,255,.62);margin:0 0 .9rem;
-     line-height:1.55;">{headline}</p>
-  <p style="font-size:.65rem;color:rgba(255,255,255,.25);
-     font-family:'JetBrains Mono',monospace;text-transform:uppercase;
-     letter-spacing:.12em;margin:0 0 .55rem;">Top 5 drivers of recession risk:</p>
-  {rows_html}
-  {rest_html}
-</div>"""
 
 
 def policy_effect(policy, vals):
@@ -815,11 +819,8 @@ def build_context(live, live_prob, live_stress, sim_vals, sim_prob):
     can ground its reasoning in the actual data rather than generic statements."""
     names = FEAT_NAMES
 
-    # Compute top-3 contributors using the same formula as explain_prediction
-    # contribution_i = _SIGNS[i] × _RAW_W[i] × z[i]
-    # Positive = raising risk, Negative = lowering risk (no exceptions)
-    z_live  = scaler.transform([sim_vals])[0]
-    contrib = _SIGNS * _RAW_W * z_live
+    # Use compute_contributions (MACRO_MEAN/MACRO_STD, no scaler, z clipped to [-3,+3])
+    contrib, z_live = compute_contributions(sim_vals)
     top3_idx = np.argsort(-np.abs(contrib))[:3]
     driver_lines = []
     for i in top3_idx:
@@ -1320,7 +1321,7 @@ with r3:
 
 # ── Why this prediction ──
 if st.button("🔍 Why this prediction?", use_container_width=False):
-    expl = explain_prediction(scaler, sim_vals)
+    expl = explain_prediction(sim_vals)
     st.markdown(format_explanation_panel(expl, sim_prob), unsafe_allow_html=True)
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
