@@ -341,229 +341,177 @@ FEATURE_COLS = [
 ]
 
 # ══════════════════════════════════════════════════════════════
-# FEATURE CONTRIBUTION SYSTEM
-# ══════════════════════════════════════════════════════════════
-#
-# DIRECTION is FIXED and UNCONDITIONAL — no conditional z logic.
-#   +1 = higher value ALWAYS raises recession risk
-#   -1 = higher value ALWAYS lowers recession risk
-#
-# Formula (used in explain_prediction and build_context):
-#   z_i = clip((value_i - MACRO_MEAN[i]) / MACRO_STD[i], -3, +3)
-#   contribution_i = DIRECTION[i] * WEIGHT[i] * z_i
-#   contribution_i > 0  → "raising risk"   (always correct by construction)
-#   contribution_i < 0  → "lowering risk"  (always correct by construction)
-#
-# The stress score used in ML training still uses the fitted StandardScaler
-# (build_df / stress_from_vals) for scale consistency with the Random Forest.
-# The explanation panel uses MACRO_MEAN/MACRO_STD to keep z-scores in [-3,+3].
+# FEATURE CONTRIBUTION SYSTEM — hardcoded directions, no dynamic logic
 # ══════════════════════════════════════════════════════════════
 
 FEAT_NAMES = [
-    "CPI Inflation",         # 0
-    "Unemployment",          # 1
-    "S&P 500",               # 2
-    "Consumer Confidence",   # 3
-    "Fed Funds Rate",        # 4
-    "GDP Growth",            # 5
-    "PMI",                   # 6
-    "Oil Price",             # 7
-    "Yield Spread (10y-2y)", # 8
-    "Credit Spread",         # 9
-    "Housing Starts",        # 10
-    "Retail Sales",          # 11
+    "CPI Inflation",         # 0  direction +1: higher → always increases risk
+    "Unemployment",          # 1  direction +1: higher → always increases risk
+    "S&P 500",               # 2  direction -1: higher → always lowers risk
+    "Consumer Confidence",   # 3  direction -1: higher → always lowers risk
+    "Fed Funds Rate",        # 4  direction +1: higher → always increases risk
+    "GDP Growth",            # 5  direction -1: higher → always lowers risk
+    "PMI",                   # 6  direction -1: higher → always lowers risk
+    "Oil Price",             # 7  direction +1: higher → always increases risk
+    "Yield Spread (10y-2y)", # 8  direction -1: positive spread lowers risk;
+                             #                  negative (inversion) increases risk
+    "Credit Spread",         # 9  direction +1: higher → always increases risk
+    "Housing Starts",        # 10 direction -1: higher → always lowers risk
+    "Retail Sales",          # 11 direction -1: higher → always lowers risk
 ]
 
-# DIRECTION: fixed, unconditional economic sign per feature
-DIRECTION = np.array([
-    +1,   # CPI Inflation:       ↑ ALWAYS raises risk
-    +1,   # Unemployment:        ↑ ALWAYS raises risk
-    -1,   # S&P 500:             ↑ ALWAYS lowers risk
-    -1,   # Consumer Confidence: ↑ ALWAYS lowers risk
-    +1,   # Fed Funds Rate:      ↑ ALWAYS raises risk (monetary tightening)
-    -1,   # GDP Growth:          ↑ ALWAYS lowers risk
-    -1,   # PMI:                 ↑ ALWAYS lowers risk (expansion signal)
-    +1,   # Oil Price:           ↑ ALWAYS raises risk (cost-push inflation)
-    -1,   # Yield Spread:        ↑ ALWAYS lowers risk; inversion (negative) raises risk
-    +1,   # Credit Spread:       ↑ ALWAYS raises risk (default premium widening)
-    -1,   # Housing Starts:      ↑ ALWAYS lowers risk (construction activity)
-    -1,   # Retail Sales:        ↑ ALWAYS lowers risk (consumer demand signal)
-], dtype=float)
+# DIRECTION: hardcoded, never changes, never conditional on value or z-score.
+# +1 = higher value ALWAYS increases recession risk.
+# -1 = higher value ALWAYS lowers recession risk.
+DIRECTION = np.array([+1, +1, -1, -1, +1, -1, -1, +1, -1, +1, -1, -1], dtype=float)
 
-# RAW weight magnitudes (all positive) — economic importance ordering
+# Fixed economic direction labels shown to the user (match DIRECTION exactly)
+DIRECTION_LABEL = [
+    "CPI Inflation ↑ → increases risk",
+    "Unemployment ↑ → increases risk",
+    "S&P 500 ↑ → lowers risk",
+    "Consumer Confidence ↑ → lowers risk",
+    "Fed Funds Rate ↑ → increases risk",
+    "GDP Growth ↑ → lowers risk",
+    "PMI ↑ → lowers risk",
+    "Oil Price ↑ → increases risk",
+    "Yield Spread: positive lowers risk; inversion increases risk",
+    "Credit Spread ↑ → increases risk",
+    "Housing Starts ↑ → lowers risk",
+    "Retail Sales ↑ → lowers risk",
+]
+
+# Weight magnitudes (positive only). Combined with DIRECTION to form WEIGHTS.
 _RAW_W = np.array([
-    0.20,  # CPI Inflation
-    0.22,  # Unemployment      (highest: labor is strongest recession signal)
-    0.08,  # S&P 500
-    0.09,  # Consumer Confidence
-    0.05,  # Fed Funds Rate
-    0.16,  # GDP Growth        (second: directly measures output)
-    0.06,  # PMI
-    0.05,  # Oil Price
-    0.13,  # Yield Spread      (third: historically reliable recession predictor)
-    0.11,  # Credit Spread
-    0.04,  # Housing Starts
-    0.03,  # Retail Sales
+    0.20, 0.22, 0.08, 0.09, 0.05, 0.16,
+    0.06, 0.05, 0.13, 0.11, 0.04, 0.03,
 ], dtype=float)
-_RAW_W /= _RAW_W.sum()  # normalise to 1.0 (max weight ≈ 0.18)
+_RAW_W /= _RAW_W.sum()
 
-# Combined signed weights for the stress score (used in ML pipeline)
+# Signed weights used in the ML stress score pipeline only.
 WEIGHTS = DIRECTION * _RAW_W
 
-# ── Realistic macro normalisation constants ───────────────────
-# Used ONLY in explain_prediction (explanation panel).
-# Derived from post-1990 US historical data.
-# Ensures z-scores stay within [-3, +3] for all realistic input values.
-MACRO_MEAN = np.array([
-    3.0,    # CPI Inflation (%)            post-1990 avg ~2.5-3.5
-    5.5,    # Unemployment (%)             post-1990 avg ~5-6
-    3500,   # S&P 500 index level          rough mid-range 2000-2024
-    90,     # Consumer Confidence (UMich)  historical avg ~88-92
-    3.5,    # Fed Funds Rate (%)           post-1990 avg
-    2.5,    # GDP Growth (%)               post-1990 avg
-    51.5,   # PMI                          expansion midpoint
-    70,     # Oil Price ($/bbl)            post-2000 avg
-    0.8,    # Yield Spread (10y-2y, %)     typical positive spread
-    1.5,    # Credit Spread (%)            IG spread historical avg
-    1400,   # Housing Starts (thousands)   post-1990 avg
-    0.3,    # Retail Sales MoM (%)         typical monthly change
-], dtype=float)
-
-MACRO_STD = np.array([
-    1.5,    # CPI Inflation       1σ ≈ 1.5%  → z=+2 at 6% inflation
-    1.5,    # Unemployment        1σ ≈ 1.5%  → z=+2 at 8.5% unemployment
-    800,    # S&P 500             1σ ≈ 800   → z=+2 at 5100
-    15,     # Consumer Confidence 1σ ≈ 15    → z=-2 at 60
-    2.0,    # Fed Funds Rate      1σ ≈ 2.0%  → z=+2 at 7.5%
-    2.0,    # GDP Growth          1σ ≈ 2.0%  → z=-2 at -1.5% (recession)
-    5.0,    # PMI                 1σ ≈ 5     → z=-2 at 41.5 (contraction)
-    20,     # Oil Price           1σ ≈ $20   → z=+2 at $110
-    0.8,    # Yield Spread        1σ ≈ 0.8%  → z=-2 at -0.8% (inversion)
-    0.8,    # Credit Spread       1σ ≈ 0.8%  → z=+2 at 3.1%
-    200,    # Housing Starts      1σ ≈ 200k  → z=-2 at 1000k
-    0.5,    # Retail Sales        1σ ≈ 0.5%  → z=-2 at -0.7%
-], dtype=float)
+# Static macro means and stds for explanation panel z-scores.
+# Never derived from the fitted StandardScaler.
+# Calibrated so realistic live values stay within z ∈ [-3, +3].
+MACRO_MEAN = np.array([3.0, 5.5, 3500.0, 90.0, 3.5, 2.5, 51.5, 70.0, 0.8, 1.5, 1400.0, 0.3])
+MACRO_STD  = np.array([1.5, 1.5,  800.0, 15.0, 2.0, 2.0,  5.0, 20.0, 0.8, 0.8,  200.0, 0.5])
 
 
 def compute_contributions(vals):
     """
-    Compute signed per-feature risk contributions from raw indicator values.
+    contribution_i = DIRECTION[i] * weight_i * z_i
+    where z_i = clip((val_i - MACRO_MEAN[i]) / MACRO_STD[i], -3, +3)
 
-    z_i = clip((val_i - MACRO_MEAN[i]) / MACRO_STD[i], -3, +3)
-    contribution_i = DIRECTION[i] * _RAW_W[i] * z_i
+    contribution > 0 → currently increasing risk (guaranteed by construction).
+    contribution < 0 → currently lowering risk   (guaranteed by construction).
 
-    Returns:
-        contributions: array of signed floats (+raises risk / -lowers risk)
-        z_scores: array of clipped z-scores in [-3, +3]
+    No conditional logic on z or val anywhere in this function.
     """
-    vals_arr = np.asarray(vals, dtype=float)
-    z = np.clip((vals_arr - MACRO_MEAN) / MACRO_STD, -3.0, +3.0)
-    return DIRECTION * _RAW_W * z, z
+    v = np.asarray(vals, dtype=float)
+    z = np.clip((v - MACRO_MEAN) / MACRO_STD, -3.0, +3.0)
+    contributions = DIRECTION * _RAW_W * z
+    return contributions, z
 
 
 def explain_prediction(vals):
     """
-    Produce ordered list of feature contribution dicts.
-    Uses compute_contributions() — independent of the fitted scaler.
-    Direction label is ALWAYS derived from sign of contribution, never from static strings.
+    Returns list of dicts for the explanation panel.
+    'raises' is ALWAYS derived from sign of contribution — no other source.
+    'pct' is capped at 25% per feature; total sums to 100%.
     """
     contributions, z_scores = compute_contributions(vals)
     abs_c = np.abs(contributions)
     total = abs_c.sum() + 1e-9
 
-    raw_pcts = abs_c / total * 100
-    cap      = 25.0
-    capped   = np.minimum(raw_pcts, cap)
-    excess   = raw_pcts.sum() - capped.sum()
+    raw_pcts = abs_c / total * 100.0
+    cap = 25.0
+    capped = np.minimum(raw_pcts, cap)
+    excess = raw_pcts.sum() - capped.sum()
     if excess > 0:
-        headroom  = (cap - capped) * (capped < cap)
-        capped   += headroom / (headroom.sum() + 1e-9) * excess
-    capped = capped / capped.sum() * 100  # exactly 100%
+        headroom = (cap - capped) * (capped < cap)
+        capped += headroom / (headroom.sum() + 1e-9) * excess
+    capped = capped / capped.sum() * 100.0
 
     items = []
     for i in np.argsort(-abs_c):
-        raises = bool(contributions[i] > 0)  # sole truth: sign of contribution
-        items.append(dict(
-            feature      = FEAT_NAMES[i],
-            direction    = int(DIRECTION[i]),   # fixed economic direction
-            pct          = float(capped[i]),
-            raises       = raises,              # derived from contribution sign
-            effect_label = "raising risk" if raises else "lowering risk",
-            value        = float(vals[i]),
-            z            = float(z_scores[i]),  # clipped to [-3, +3]
-            contribution = float(contributions[i]),
-        ))
+        raises = bool(contributions[i] > 0)
+        items.append({
+            "feature":      FEAT_NAMES[i],
+            "dir_label":    DIRECTION_LABEL[i],     # hardcoded economic description
+            "pct":          float(capped[i]),
+            "raises":       raises,                  # from contribution sign only
+            "effect_label": "increasing risk" if raises else "lowering risk",
+            "sign_char":    "+" if raises else "−",
+            "value":        float(vals[i]),
+            "z":            float(z_scores[i]),      # always in [-3, +3]
+            "contribution": float(contributions[i]),
+            "bar_color":    "#ff6b6b" if raises else "#34c759",
+            "text_color":   "#ff9090" if raises else "#5ddb7a",
+        })
     return items
 
 
 def format_explanation_panel(items, sim_prob):
     """
-    Render 'Why this prediction?' panel.
-    All colours/labels/bars derive solely from item['raises'] (bool).
-    No conditional z-score logic. No static string direction lookup.
+    Renders the 'Why this prediction?' panel.
+    Every label, color, and bar is derived from item['raises'].
+    item['raises'] is set exclusively by the sign of contribution_i.
+    No conditional z logic. No dynamic direction interpretation.
     """
     top5   = items[:5]
     rest_n = len(items) - 5
 
-    dom      = top5[0]
-    dom_verb = "pushing up" if dom["raises"] else "holding down"
-    dom_col  = "#ff9090" if dom["raises"] else "#5ddb7a"
+    dom = top5[0]
+    dom_verb = "increasing" if dom["raises"] else "lowering"
     headline = (
         f"<b style='color:#fff'>{dom['feature']}</b> is the dominant factor "
-        f"<span style='color:{dom_col}'>{dom_verb}</span> recession risk "
-        f"({dom['pct']:.0f}% of total influence)."
+        f"<span style='color:{dom['text_color']}'>{dom_verb} recession risk</span> "
+        f"({dom['pct']:.0f}% of total model influence)."
     )
 
     rows_html = ""
     for rank, item in enumerate(top5, 1):
-        bar_color   = "#ff6b6b" if item["raises"] else "#34c759"
-        label_color = "#ff9090" if item["raises"] else "#5ddb7a"
-        sign_char   = "+" if item["raises"] else "−"
-        # Show the fixed economic direction as reference context
-        if item["feature"] == "Yield Spread (10y-2y)":
-            dir_note = "inversion (lower spread) → raises risk"
-        elif item["direction"] == +1:
-            dir_note = f"↑ value always raises risk"
-        else:
-            dir_note = f"↑ value always lowers risk"
-
         rows_html += (
-            f'<div style="margin:.45rem 0 .55rem;">'
+            f'<div style="margin:.42rem 0 .5rem;">'
             f'<div style="display:flex;align-items:baseline;gap:.4rem;flex-wrap:wrap;">'
-            f'<span style="color:rgba(255,255,255,.32);font-size:.7rem;'
-            f'font-family:"JetBrains Mono",monospace;min-width:1.1rem;">{rank}.</span>'
-            f'<span style="color:#fff;font-weight:600;font-size:.87rem;">{item["feature"]}</span>'
-            f'<span style="color:{label_color};font-size:.76rem;margin-left:.2rem;">'
-            f'({sign_char}{item["pct"]:.0f}%) {item["effect_label"]}</span>'
+            f'<span style="color:rgba(255,255,255,.3);font-size:.7rem;'
+            f'font-family:\'JetBrains Mono\',monospace;min-width:1rem;">{rank}.</span>'
+            f'<span style="color:#fff;font-weight:600;font-size:.86rem;">'
+            f'{item["feature"]}</span>'
+            f'<span style="color:{item["text_color"]};font-size:.75rem;margin-left:.2rem;">'
+            f'({item["sign_char"]}{item["pct"]:.0f}%) {item["effect_label"]}</span>'
             f'</div>'
-            f'<div style="font-size:.68rem;color:rgba(255,255,255,.28);'
-            f'padding-left:1.4rem;margin:.06rem 0 .2rem;line-height:1.5;">'
-            f'Value: <b style="color:rgba(255,255,255,.65)">{item["value"]:.2f}</b> · '
-            f'z-score: <b style="color:rgba(255,255,255,.65)">{item["z"]:+.2f}</b> · '
-            f'contribution: <b style="color:{label_color}">{item["contribution"]:+.4f}</b>'
-            f'<br><span style="color:rgba(255,255,255,.18)">{dir_note}</span>'
+            f'<div style="font-size:.67rem;color:rgba(255,255,255,.28);'
+            f'padding-left:1.35rem;margin:.05rem 0 .18rem;line-height:1.5;">'
+            f'Value: <b style="color:rgba(255,255,255,.6)">{item["value"]:.2f}</b> · '
+            f'z-score: <b style="color:rgba(255,255,255,.6)">{item["z"]:+.2f}</b> · '
+            f'contribution: <b style="color:{item["text_color"]}">'
+            f'{item["contribution"]:+.4f}</b>'
+            f'<br><span style="color:rgba(255,255,255,.16)">'
+            f'{item["dir_label"]}</span>'
             f'</div>'
-            f'<div style="margin-left:1.4rem;" class="feat-bar-wrap">'
+            f'<div style="margin-left:1.35rem;" class="feat-bar-wrap">'
             f'<div class="feat-bar-fill" style="width:{min(int(item["pct"]),100)}%;'
-            f'background:{bar_color};opacity:.82;"></div></div>'
+            f'background:{item["bar_color"]};opacity:.8;"></div></div>'
             f'</div>'
         )
 
     rest_html = (
-        f'<p style="font-size:.68rem;color:rgba(255,255,255,.22);margin-top:.6rem;">'
+        f'<p style="font-size:.67rem;color:rgba(255,255,255,.2);margin-top:.55rem;">'
         f'+ {rest_n} minor contributing factors not shown</p>'
     ) if rest_n > 0 else ""
 
-    return f"""
-<div class="why-box">
-  <p style="font-size:.83rem;color:rgba(255,255,255,.62);margin:0 0 .85rem;
-     line-height:1.55;">{headline}</p>
-  <p style="font-size:.62rem;color:rgba(255,255,255,.2);
-     font-family:'JetBrains Mono',monospace;text-transform:uppercase;
-     letter-spacing:.12em;margin:0 0 .5rem;">Top 5 drivers of recession risk:</p>
-  {rows_html}
-  {rest_html}
-</div>"""
+    return (
+        f'<div class="why-box">'
+        f'<p style="font-size:.82rem;color:rgba(255,255,255,.6);margin:0 0 .8rem;'
+        f'line-height:1.5;">{headline}</p>'
+        f'<p style="font-size:.61rem;color:rgba(255,255,255,.18);'
+        f'font-family:\'JetBrains Mono\',monospace;text-transform:uppercase;'
+        f'letter-spacing:.12em;margin:0 0 .45rem;">Top 5 drivers of recession risk:</p>'
+        f'{rows_html}{rest_html}'
+        f'</div>'
+    )
 
 def build_df(series):
     df = pd.DataFrame({c: series[c] for c in FEATURE_COLS})
@@ -761,7 +709,8 @@ def policy_effect(policy, vals):
 # LLM — ROBUST PARSING
 # ══════════════════════════════════════════════
 
-def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=560):
+def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=120):
+    """Call OpenRouter. On ANY failure return a clean fallback message — never expose raw errors."""
     try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -780,22 +729,23 @@ def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=560):
                     {"role": "user",   "content": user_msg},
                 ],
             },
-            timeout=26,
+            timeout=20,
         )
         data = resp.json()
-        # ── Multi-path safe parsing ──
-        try:    return data["choices"][0]["message"]["content"].strip()
-        except: pass
-        try:    return data["output"][0]["content"][0]["text"].strip()
-        except: pass
-        for k in ("content","text","response","answer"):
-            if k in data:
-                return str(data[k]).strip()
-        return f"⚠ Unexpected response format from model. Raw: {str(data)[:240]}"
-    except requests.exceptions.Timeout:
-        return "⚠ Model timed out. Try again."
-    except Exception as e:
-        return f"⚠ Error: {str(e)}"
+        try:
+            return data["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            return data["output"][0]["content"][0]["text"].strip()
+        except (KeyError, IndexError, TypeError):
+            pass
+        for k in ("content", "text", "response", "answer"):
+            if k in data and isinstance(data[k], str):
+                return data[k].strip()
+        return "AI insights temporarily unavailable due to API limits."
+    except Exception:
+        return "AI insights temporarily unavailable due to API limits."
 
 
 # ── SYSTEM PROMPT: human economist, no templates ──
@@ -815,22 +765,20 @@ You are not a textbook. You are an analyst with a point of view."""
 
 
 def build_context(live, live_prob, live_stress, sim_vals, sim_prob):
-    """Build LLM system context, including top-3 stress drivers so the model
-    can ground its reasoning in the actual data rather than generic statements."""
-    names = FEAT_NAMES
-
-    # Use compute_contributions (MACRO_MEAN/MACRO_STD, no scaler, z clipped to [-3,+3])
-    contrib, z_live = compute_contributions(sim_vals)
-    top3_idx = np.argsort(-np.abs(contrib))[:3]
+    """Build LLM system context with top-3 stress drivers from compute_contributions."""
+    contrib, z_arr = compute_contributions(sim_vals)
+    top3 = np.argsort(-np.abs(contrib))[:3]
     driver_lines = []
-    for i in top3_idx:
-        effect = "raising" if contrib[i] > 0 else "lowering"
+    for i in top3:
+        effect = "increasing" if contrib[i] > 0 else "lowering"
         driver_lines.append(
-            f"  • {names[i]}: {sim_vals[i]:.2f} (z={z_live[i]:+.2f}, currently {effect} risk)"
+            f"  {FEAT_NAMES[i]}: {sim_vals[i]:.2f} "
+            f"(z={z_arr[i]:+.2f}, currently {effect} risk)"
         )
     drivers_block = "\n".join(driver_lines)
-
-    sim_lines = "\n".join(f"  {n}: {v:.2f}" for n, v in zip(names, sim_vals))
+    sim_lines = "\n".join(
+        f"  {n}: {v:.2f}" for n, v in zip(FEAT_NAMES, sim_vals)
+    )
     return f"""{ANALYST_STYLE}
 
 === CURRENT MACRO DATA ===
