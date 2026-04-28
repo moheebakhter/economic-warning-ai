@@ -748,7 +748,7 @@ def policy_effect(policy, vals):
 #         return "AI insights temporarily unavailable due to API limits."
 
 
-def call_llm(system_prompt, user_msg, temperature=0.5):
+def call_llm(system_prompt, user_msg, temperature=0.5, max_tokens=120):
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     headers = {
@@ -762,8 +762,8 @@ def call_llm(system_prompt, user_msg, temperature=0.5):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg}
         ],
-        "temperature": temperature,   # <-- FIXED
-        "max_tokens": 100
+        "temperature": temperature,
+        "max_tokens": max_tokens   # ← NOW MATCHES CALL
     }
 
     try:
