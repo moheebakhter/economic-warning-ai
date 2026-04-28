@@ -709,41 +709,74 @@ def policy_effect(policy, vals):
 # LLM — ROBUST PARSING
 # ══════════════════════════════════════════════
 
-def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=120):
-    """Call OpenRouter. On ANY failure return a clean fallback message — never expose raw errors."""
+# def call_llm(system_prompt, user_msg, temperature=0.78, max_tokens=120):
+#     """Call OpenRouter. On ANY failure return a clean fallback message — never expose raw errors."""
+#     try:
+#         resp = requests.post(
+#             "https://openrouter.ai/api/v1/chat/completions",
+#             headers={
+#                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+#                 "Content-Type":  "application/json",
+#                 "HTTP-Referer":  "https://economic-warning-ai.streamlit.app",
+#                 "X-Title":       "Economic Early Warning System",
+#             },
+#             json={
+#                 "model":       "mistralai/mixtral-8x7b-instruct",
+#                 "temperature": temperature,
+#                 "max_tokens":  max_tokens,
+#                 "messages": [
+#                     {"role": "system", "content": system_prompt},
+#                     {"role": "user",   "content": user_msg},
+#                 ],
+#             },
+#             timeout=20,
+#         )
+#         data = resp.json()
+#         try:
+#             return data["choices"][0]["message"]["content"].strip()
+#         except (KeyError, IndexError, TypeError):
+#             pass
+#         try:
+#             return data["output"][0]["content"][0]["text"].strip()
+#         except (KeyError, IndexError, TypeError):
+#             pass
+#         for k in ("content", "text", "response", "answer"):
+#             if k in data and isinstance(data[k], str):
+#                 return data[k].strip()
+#         return "AI insights temporarily unavailable due to API limits."
+#     except Exception:
+#         return "AI insights temporarily unavailable due to API limits."
+
+
+def call_llm(system_prompt, user_msg):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "mistralai/mixtral-8x7b-instruct",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_msg}
+        ],
+        "temperature": 0.5,
+        "max_tokens": 100   # SAFE LIMIT (no credit burn)
+    }
+
     try:
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type":  "application/json",
-                "HTTP-Referer":  "https://economic-warning-ai.streamlit.app",
-                "X-Title":       "Economic Early Warning System",
-            },
-            json={
-                "model":       "mistralai/mixtral-8x7b-instruct",
-                "temperature": temperature,
-                "max_tokens":  max_tokens,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": user_msg},
-                ],
-            },
-            timeout=20,
-        )
-        data = resp.json()
-        try:
-            return data["choices"][0]["message"]["content"].strip()
-        except (KeyError, IndexError, TypeError):
-            pass
-        try:
-            return data["output"][0]["content"][0]["text"].strip()
-        except (KeyError, IndexError, TypeError):
-            pass
-        for k in ("content", "text", "response", "answer"):
-            if k in data and isinstance(data[k], str):
-                return data[k].strip()
-        return "AI insights temporarily unavailable due to API limits."
+        res = requests.post(url, headers=headers, json=payload, timeout=8)
+
+        # If API fails or rate limit
+        if res.status_code != 200:
+            return "AI insights temporarily unavailable due to API limits."
+
+        data = res.json()
+
+        return data["choices"][0]["message"]["content"].strip()
+
     except Exception:
         return "AI insights temporarily unavailable due to API limits."
 
