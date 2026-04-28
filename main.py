@@ -748,7 +748,7 @@ def policy_effect(policy, vals):
 #         return "AI insights temporarily unavailable due to API limits."
 
 
-def call_llm(system_prompt, user_msg):
+def call_llm(system_prompt, user_msg, temperature=0.5):
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     headers = {
@@ -762,19 +762,17 @@ def call_llm(system_prompt, user_msg):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg}
         ],
-        "temperature": 0.5,
-        "max_tokens": 100   # SAFE LIMIT (no credit burn)
+        "temperature": temperature,   # <-- FIXED
+        "max_tokens": 100
     }
 
     try:
         res = requests.post(url, headers=headers, json=payload, timeout=8)
 
-        # If API fails or rate limit
         if res.status_code != 200:
             return "AI insights temporarily unavailable due to API limits."
 
         data = res.json()
-
         return data["choices"][0]["message"]["content"].strip()
 
     except Exception:
